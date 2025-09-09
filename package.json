@@ -1,0 +1,20 @@
+{
+  "name": "tarot-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.11.0",
+    "dotenv": "^17.2.1",
+    "sharp": "^0.34.3",
+    "sqlite3": "^5.1.7",
+    "telegraf": "^4.16.3",
+    "whatwg-url": "^14.2.0"
+  }
+}
