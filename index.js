@@ -43,9 +43,10 @@ app.post("/yookassa-webhook", async (req, res) => {
 });
 
 const options = {
-  key: fs.readFileSync("/cert/certificate.key"),
-  cert: fs.readFileSync("/cert/certificate.crt")
+  key: fs.readFileSync(path.join(__dirname, "/cert/certificate.key")),
+  cert: fs.readFileSync(path.join(__dirname, "/cert/certificate.crt"))
 };
+
 
 // создаём HTTPS-сервер
 https.createServer(options, app).listen(443, () => {
