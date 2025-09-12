@@ -7,3 +7,6 @@ build/
 coverage/
 .nyc_output/
 tarot.db
+*.key
+*.pem
+*.crt

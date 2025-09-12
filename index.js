@@ -10,6 +10,7 @@ const db = require('./db.js');
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const { tarotDeck } = require("./deck/deck.js");
+const https = require("https");
 
 const bot = new Telegraf(TELEGRAM_TOKEN);
 
@@ -34,15 +35,21 @@ app.post("/yookassa-webhook", async (req, res) => {
 
     if (userId && amount) {
       await db.addQuestionsAfterPayment(userId, amount);
-      console.log(`✅ Пользователю ${userId} начислено ${amount} вопросов (платёж ${id})`);
+      console.log(`✅ Пользователю ${userId} начислено ${amount/10} вопросов (платёж ${id})`);
     }
   }
 
   res.sendStatus(200);
 });
 
-app.listen(3000, () => {
-  console.log("🚀 Webhook сервер слушает порт 3000");
+const options = {
+  key: fs.readFileSync("/cert/certificate.key"),
+  cert: fs.readFileSync("/cert/certificate.crt")
+};
+
+// создаём HTTPS-сервер
+https.createServer(options, app).listen(443, () => {
+  console.log("🚀 HTTPS сервер слушает порт 443");
 });
 
 
