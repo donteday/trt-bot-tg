@@ -20,22 +20,19 @@ const bodyParser = require("body-parser");
 const app = express();
 app.use(bodyParser.json());
 
-// Юкасса будет слать сюда уведомления
-
-
 app.post("/yookassa-webhook", async (req, res) => {
   const event = req.body;
-
-  console.log("📩 Webhook:", JSON.stringify(event, null, 2));
 
   if (event.event === "payment.succeeded") {
     const { id, metadata } = event.object;
     const userId = metadata?.userId;
     const amount = metadata?.amount;
+    const tokensAmount = metadata?.tokensAmount;
 
     if (userId && amount) {
-      await db.addQuestionsAfterPayment(userId, amount);
-      console.log(`✅ Пользователю ${userId} начислено ${amount/10} вопросов (платёж ${id})`);
+      await db.addQuestionsAfterPayment(userId, tokensAmount);
+      await ctx.reply('✅ Оплата прошла!');
+      console.log('\x1b[32m%s\x1b[0m', `✅ Пользователю ${userId} начислено ${tokensAmount} вопросов + ${amount}₽`);
     }
   }
 
@@ -47,12 +44,9 @@ const options = {
   cert: fs.readFileSync(path.join(__dirname, "/cert/certificate.crt"))
 };
 
-
-// создаём HTTPS-сервер
 https.createServer(options, app).listen(443, () => {
   console.log("🚀 HTTPS сервер слушает порт 443");
 });
-
 
 const SUIT_EMOJI = {
   Wands: "🔥",
@@ -65,8 +59,14 @@ const SUIT_EMOJI = {
 // Команда для покупки вопросов
 bot.action(/buy_questions_(\d+)/, async (ctx) => {
   const userId = ctx.from.id;
-  const amount = parseInt(ctx.match[1]);
-  const price = amount * 10; // 100 рублей за вопрос
+  const packageId = parseInt(ctx.match[1]);
+  const packages = {
+    1: { amount: 3, price: 49 },
+    2: { amount: 10, price: 99 },
+    3: { amount: 40, price: 299 },
+    4: { amount: 100, price: 499 }
+  };
+  const selectedPackage = packages[packageId];
 
   try {
     // Получаем данные пользователя
@@ -78,25 +78,25 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
         '📧 Для оформления покупки нам нужен ваш email адрес для отправки чека.\n\n' +
         'Пожалуйста, введите ваш email:'
       );
-      userStates.set(userId, { action: 'buy_questions', amount: amount });
+      userStates.set(userId, { action: 'buy_questions', amount: selectedPackage.amount });
       return;
     }
 
     // Создаем платеж с email
     const payment = await yookassa.createPayment(
       userId,
-      price,
-      `Покупка ${amount} токенов для оказания информационных услуг`,
-      user.email
+      selectedPackage.price,
+      `Покупка ${selectedPackage.amount} токенов для оказания информационных услуг`,
+      user.email,
+      selectedPackage.amount
     );
 
     await ctx.reply(
-      `💳 Для покупки ${amount} вопросов (${price} руб.) перейдите по ссылке для оплаты:\n\n` +
+      `💳 Для покупки ${selectedPackage.amount} вопросов (${selectedPackage.price} руб.) перейдите по ссылке для оплаты:\n\n` +
       `После успешной оплаты чек будет отправлен на email: ${user.email}\n\n` +
       `${payment.confirmation.confirmation_url}`,
       Markup.inlineKeyboard([
         Markup.button.url('💳 Оплатить', payment.confirmation.confirmation_url),
-        Markup.button.callback('🔄 Проверить статус', `check_payment_${payment.id}`),
         Markup.button.callback('✏️ Изменить email', 'change_email_before_payment')
       ])
     );
@@ -106,42 +106,33 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
   }
 });
 
+async function sendNoQuestionsMessage(ctx) {
+  return ctx.reply(
+    "🚫 У тебя закончились бесплатные вопросы.\nВыбери пакет, чтобы продолжить 🌟",
+    Markup.inlineKeyboard([
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
+      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
+      [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
+      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")]
+    ])
+  );
+}
+
 bot.command("add", async (ctx) => {
   await ctx.reply(
     "🚫 У тебя закончились бесплатные вопросы.\nВыбери пакет, чтобы продолжить 🌟",
     Markup.inlineKeyboard([
-      [Markup.button.callback("✨ 3 запроса — 30₽", "buy_questions_3")],
-      [Markup.button.callback("🔮 10 запросов — 100₽", "buy_questions_10")],
-      [Markup.button.callback("🌌 40 запросов — 400₽", "buy_questions_40")],
-      [Markup.button.callback("💎 100 запросов — 1000₽", "bbuy_questions_100")]
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
+      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
+      [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
+      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")]
     ])
   );
   return;
 });
 
-// Проверка статуса платежа
-bot.action(/check_payment_(.+)/, async (ctx) => {
-  const paymentId = ctx.match[1];
-
-  try {
-    const status = await yookassa.checkPaymentStatus(paymentId);
-
-    if (status === 'succeeded') {
-      await ctx.editMessageText('✅ Платеж успешно завершен! Вопросы добавлены к вашему счету.');
-    } else if (status === 'pending') {
-      await ctx.editMessageText('⏳ Платеж еще обрабатывается. Попробуйте проверить позже.');
-    } else {
-      await ctx.editMessageText('❌ Платеж не прошел. Попробуйте оплатить снова.');
-    }
-  } catch (error) {
-    await ctx.editMessageText('❌ Ошибка при проверке статуса платежа.');
-  }
-});
-
 // Состояния для сбора email
 const userStates = new Map();
-
-// Вебхук для обработки уведомлений от ЮКассы
 
 
 function drawCards(tarotDeck) {
@@ -362,28 +353,7 @@ bot.on("text", async (ctx) => {
       // Сохраняем email
       await db.updateUserEmail(userId, email);
       userStates.delete(userId);
-
-      const amount = userState.amount;
-      const price = amount * 100;
-
-      // Создаем платеж с email
-      const payment = await yookassa.createPayment(
-        userId,
-        price,
-        `Покупка ${amount} вопросов для Таро`,
-        email
-      );
-
-      await ctx.reply(
-        `✅ Email сохранен!\n\n` +
-        `💳 Для покупки ${amount} вопросов (${price} руб.) перейдите по ссылке для оплаты:\n\n` +
-        `После успешной оплаты чек будет отправлен на email: ${email}\n\n` +
-        `${payment.confirmation.confirmation_url}`,
-        Markup.inlineKeyboard([
-          Markup.button.url('💳 Оплатить', payment.confirmation.confirmation_url),
-          Markup.button.callback('🔄 Проверить статус', `check_payment_${payment.id}`)
-        ])
-      );
+      await ctx.reply(`✅ Email сохранен!\n\n`);
     } catch (error) {
       console.error('Payment error:', error);
       await ctx.reply('❌ Произошла ошибка при создании платежа. Попробуйте позже.');
@@ -403,15 +373,7 @@ bot.on("text", async (ctx) => {
   const user = await getUser(userId);
 
   if (user.questionsLeft <= 0) {
-    await ctx.reply(
-      "🚫 У тебя закончились бесплатные вопросы.\nВыбери пакет, чтобы продолжить 🌟",
-      Markup.inlineKeyboard([
-        [Markup.button.callback("✨ 3 запроса — 49₽", "buy_3")],
-        [Markup.button.callback("🔮 10 запросов — 99₽", "buy_3")],
-        [Markup.button.callback("🌌 40 запросов — 299₽", "buy_3")],
-        [Markup.button.callback("💎 100 запросов — 499₽", "buy_3")]
-      ])
-    );
+    sendNoQuestionsMessage(ctx);
     return;
   }
 
@@ -478,6 +440,10 @@ bot.on("text", async (ctx) => {
 
     // Получаем ответ со стримингом
     const interpretation = await askOpenAIStreaming(prompt, handleStream, handleComplete);
+    if (user.questionsLeft <= 0) {
+      sendNoQuestionsMessage(ctx);
+      return;
+    }
 
   } catch (err) {
     console.error(err);

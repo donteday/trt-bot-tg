@@ -7,7 +7,7 @@ const yookassa = new yooKassa({
 });
 
 // Создание платежа
-async function createPayment(userId, amount, description = "Покупка вопросов", email = null) {
+async function createPayment(userId, amount, description = "Покупка вопросов", email = null, tokensAmount) {
   try {
     const paymentData = {
       amount: {
@@ -23,7 +23,8 @@ async function createPayment(userId, amount, description = "Покупка во�
       },
       metadata: {
         userId: userId,
-        amount: amount
+        amount: amount,
+        tokensAmount: tokensAmount
       },
       capture: true,
       description: description
