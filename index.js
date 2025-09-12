@@ -3,14 +3,48 @@ const { getUser, useQuestion, addQuestions, useFate } = require("./db");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
-const { Telegraf } = require("telegraf");
-const { Markup } = require("telegraf");
+const { Telegraf, Markup } = require("telegraf");
 require('dotenv').config();
-
+const yookassa = require('./yookassa');
+const db = require('./db.js');
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
+const { tarotDeck } = require("./deck/deck.js");
 
 const bot = new Telegraf(TELEGRAM_TOKEN);
+
+const express = require("express");
+const bodyParser = require("body-parser");
+
+const app = express();
+app.use(bodyParser.json());
+
+// Юкасса будет слать сюда уведомления
+
+
+app.post("/yookassa-webhook", async (req, res) => {
+  const event = req.body;
+
+  console.log("📩 Webhook:", JSON.stringify(event, null, 2));
+
+  if (event.event === "payment.succeeded") {
+    const { id, metadata } = event.object;
+    const userId = metadata?.userId;
+    const amount = metadata?.amount;
+
+    if (userId && amount) {
+      await db.addQuestionsAfterPayment(userId, amount);
+      console.log(`✅ Пользователю ${userId} начислено ${amount} вопросов (платёж ${id})`);
+    }
+  }
+
+  res.sendStatus(200);
+});
+
+app.listen(3000, () => {
+  console.log("🚀 Webhook сервер слушает порт 3000");
+});
+
 
 const SUIT_EMOJI = {
   Wands: "🔥",
@@ -20,7 +54,87 @@ const SUIT_EMOJI = {
   Major: "✨",
 };
 
-const {tarotDeck} = require("./deck/deck.js");
+// Команда для покупки вопросов
+bot.action(/buy_questions_(\d+)/, async (ctx) => {
+  const userId = ctx.from.id;
+  const amount = parseInt(ctx.match[1]);
+  const price = amount * 10; // 100 рублей за вопрос
+
+  try {
+    // Получаем данные пользователя
+    const user = await db.getUser(userId);
+
+    // Проверяем, есть ли email у пользователя
+    if (!user.email) {
+      await ctx.reply(
+        '📧 Для оформления покупки нам нужен ваш email адрес для отправки чека.\n\n' +
+        'Пожалуйста, введите ваш email:'
+      );
+      userStates.set(userId, { action: 'buy_questions', amount: amount });
+      return;
+    }
+
+    // Создаем платеж с email
+    const payment = await yookassa.createPayment(
+      userId,
+      price,
+      `Покупка ${amount} токенов для оказания информационных услуг`,
+      user.email
+    );
+
+    await ctx.reply(
+      `💳 Для покупки ${amount} вопросов (${price} руб.) перейдите по ссылке для оплаты:\n\n` +
+      `После успешной оплаты чек будет отправлен на email: ${user.email}\n\n` +
+      `${payment.confirmation.confirmation_url}`,
+      Markup.inlineKeyboard([
+        Markup.button.url('💳 Оплатить', payment.confirmation.confirmation_url),
+        Markup.button.callback('🔄 Проверить статус', `check_payment_${payment.id}`),
+        Markup.button.callback('✏️ Изменить email', 'change_email_before_payment')
+      ])
+    );
+  } catch (error) {
+    console.error('Payment error:', error);
+    await ctx.reply('❌ Произошла ошибка при создании платежа. Попробуйте позже.');
+  }
+});
+
+bot.command("add", async (ctx) => {
+  await ctx.reply(
+    "🚫 У тебя закончились бесплатные вопросы.\nВыбери пакет, чтобы продолжить 🌟",
+    Markup.inlineKeyboard([
+      [Markup.button.callback("✨ 3 запроса — 30₽", "buy_questions_3")],
+      [Markup.button.callback("🔮 10 запросов — 100₽", "buy_questions_10")],
+      [Markup.button.callback("🌌 40 запросов — 400₽", "buy_questions_40")],
+      [Markup.button.callback("💎 100 запросов — 1000₽", "bbuy_questions_100")]
+    ])
+  );
+  return;
+});
+
+// Проверка статуса платежа
+bot.action(/check_payment_(.+)/, async (ctx) => {
+  const paymentId = ctx.match[1];
+
+  try {
+    const status = await yookassa.checkPaymentStatus(paymentId);
+
+    if (status === 'succeeded') {
+      await ctx.editMessageText('✅ Платеж успешно завершен! Вопросы добавлены к вашему счету.');
+    } else if (status === 'pending') {
+      await ctx.editMessageText('⏳ Платеж еще обрабатывается. Попробуйте проверить позже.');
+    } else {
+      await ctx.editMessageText('❌ Платеж не прошел. Попробуйте оплатить снова.');
+    }
+  } catch (error) {
+    await ctx.editMessageText('❌ Ошибка при проверке статуса платежа.');
+  }
+});
+
+// Состояния для сбора email
+const userStates = new Map();
+
+// Вебхук для обработки уведомлений от ЮКассы
+
 
 function drawCards(tarotDeck) {
   const selected = [];
@@ -122,7 +236,7 @@ bot.start((ctx) =>
   ctx.reply(
     "Привет! Задай свой вопрос, и я вытащу 3 карты Таро 🔮\n" +
     "Например: «Что мне учесть при смене работы? Что у меня будет с ним (ней)»\n\n"
-    
+
   )
 );
 bot.action("buy_3", async (ctx) => {
@@ -169,9 +283,9 @@ async function askOpenAIStreaming(prompt, onChunk, onComplete) {
       body: JSON.stringify({
         model: "deepseek-chat",
         messages: [
-          { 
-            role: "system", 
-            content: "Ты профессиональный таролог и психологичный консультант. Пиши по-русски, структурированно и бережно." 
+          {
+            role: "system",
+            content: "Ты профессиональный таролог и психологичный консультант. Пиши по-русски, структурированно и бережно."
           },
           { role: "user", content: prompt },
         ],
@@ -222,8 +336,51 @@ async function askOpenAIStreaming(prompt, onChunk, onComplete) {
 }
 bot.on("text", async (ctx) => {
   const userId = ctx.from.id;
+  const userState = userStates.get(userId);
   const question = (ctx.message?.text || "").trim();
   console.log(ctx.from.username, question);
+
+  if (userState && userState.action === 'buy_questions') {
+    const email = ctx.message.text.trim();
+
+    // Валидация email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      await ctx.reply('❌ Пожалуйста, введите корректный email адрес.');
+      return;
+    }
+
+    try {
+      // Сохраняем email
+      await db.updateUserEmail(userId, email);
+      userStates.delete(userId);
+
+      const amount = userState.amount;
+      const price = amount * 100;
+
+      // Создаем платеж с email
+      const payment = await yookassa.createPayment(
+        userId,
+        price,
+        `Покупка ${amount} вопросов для Таро`,
+        email
+      );
+
+      await ctx.reply(
+        `✅ Email сохранен!\n\n` +
+        `💳 Для покупки ${amount} вопросов (${price} руб.) перейдите по ссылке для оплаты:\n\n` +
+        `После успешной оплаты чек будет отправлен на email: ${email}\n\n` +
+        `${payment.confirmation.confirmation_url}`,
+        Markup.inlineKeyboard([
+          Markup.button.url('💳 Оплатить', payment.confirmation.confirmation_url),
+          Markup.button.callback('🔄 Проверить статус', `check_payment_${payment.id}`)
+        ])
+      );
+    } catch (error) {
+      console.error('Payment error:', error);
+      await ctx.reply('❌ Произошла ошибка при создании платежа. Попробуйте позже.');
+    }
+  }
 
   // Проверка вопроса
   if (!isValidQuestion(question)) {
@@ -271,15 +428,15 @@ bot.on("text", async (ctx) => {
 
     // Создаем начальное сообщение для стриминга
     const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
-    let currentText = "✨✨✨\n\n";
+    let currentText = "🔮\n\n";
     let lastUpdate = Date.now();
 
     const prompt = buildPrompt(question, cards);
-    
+
     // Функция для обработки стриминга
     const handleStream = async (chunk) => {
       currentText += chunk;
-      
+
       // Обновляем сообщение не чаще чем раз в 500мс
       if (Date.now() - lastUpdate > 2000) {
         try {
