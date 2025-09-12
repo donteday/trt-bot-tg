@@ -108,7 +108,7 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
 
 async function sendNoQuestionsMessage(ctx) {
   return ctx.reply(
-    "🚫 У тебя закончились бесплатные вопросы.\nВыбери пакет, чтобы продолжить 🌟",
+    "🌟 Выбери пакет, чтобы продолжить 🌟",
     Markup.inlineKeyboard([
       [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
       [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
@@ -354,6 +354,8 @@ bot.on("text", async (ctx) => {
       await db.updateUserEmail(userId, email);
       userStates.delete(userId);
       await ctx.reply(`✅ Email сохранен!\n\n`);
+      sendNoQuestionsMessage(ctx);
+      return;
     } catch (error) {
       console.error('Payment error:', error);
       await ctx.reply('❌ Произошла ошибка при создании платежа. Попробуйте позже.');
