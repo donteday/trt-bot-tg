@@ -31,7 +31,10 @@ app.post("/yookassa-webhook", async (req, res) => {
 
     if (userId && amount) {
       await db.addQuestionsAfterPayment(userId, tokensAmount);
-      await ctx.reply('✅ Оплата прошла!');
+      await bot.telegram.sendMessage(
+        userId,
+        `✅ Оплата прошла!\nВам начислено ${tokensAmount} вопросов 🌟`
+      );
       console.log('\x1b[32m%s\x1b[0m', `✅ Пользователю ${userId} начислено ${tokensAmount} вопросов + ${amount}₽`);
     }
   }
