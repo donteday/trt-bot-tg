@@ -10,3 +10,4 @@ tarot.db
 *.key
 *.pem
 *.crt
+*.db
