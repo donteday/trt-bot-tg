@@ -6,7 +6,7 @@ db.serialize(() => {
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       userId INTEGER PRIMARY KEY,
-      questionsLeft INTEGER DEFAULT 5,
+      questionsLeft INTEGER DEFAULT 3,
       fateUsed INTEGER DEFAULT 0,
       email TEXT DEFAULT NULL,
       yookassaPaymentId TEXT DEFAULT NULL,
@@ -38,9 +38,9 @@ function getUser(userId) {
     db.get("SELECT * FROM users WHERE userId = ?", [userId], (err, row) => {
       if (err) return reject(err);
       if (!row) {
-        db.run("INSERT INTO users (userId, questionsLeft, fateUsed) VALUES (?, 5, 0)", [userId], function (err2) {
+        db.run("INSERT INTO users (userId, questionsLeft, fateUsed) VALUES (?, 3, 0)", [userId], function (err2) {
           if (err2) return reject(err2);
-          resolve({ userId, questionsLeft: 5, fateUsed: 0 });
+          resolve({ userId, questionsLeft: 3, fateUsed: 0 });
         });
       } else {
         resolve(row);
