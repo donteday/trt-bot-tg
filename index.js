@@ -167,9 +167,6 @@ function isValidQuestion(text) {
   const words = text.trim().split(/\s+/);
   if (words.length < 1) return false;
 
-  // 3. Должен заканчиваться на вопросительный знак
-  if (!text.trim().endsWith("?")) return false;
-
   return true;
 }
 
@@ -367,7 +364,7 @@ bot.on("text", async (ctx) => {
 
   // Проверка вопроса
   if (!isValidQuestion(question)) {
-    await ctx.reply("❌ Пожалуйста, задай осмысленный вопрос (не менее 2 слов и в конце знак вопроса).");
+    await ctx.reply("❌ Пожалуйста, задай вопрос (не менее 2 слов).");
     return;
   }
   if (!question) {
