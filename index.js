@@ -256,13 +256,6 @@ bot.command("balance", async (ctx) => {
   );
 });
 
-// команда: добавить вопросы (для теста)
-bot.command("addquestions", async (ctx) => {
-  await addQuestions(ctx.from.id, 5);
-  const user = await getUser(ctx.from.id);
-  await ctx.reply(`➕ Добавлено 5 вопросов. Теперь у тебя ${user.questionsLeft}.`);
-});
-
 async function askOpenAIStreaming(prompt, onChunk, onComplete) {
 
   let fullResponse = "";
