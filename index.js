@@ -238,11 +238,6 @@ bot.start((ctx) =>
 
   )
 );
-bot.action("buy_3", async (ctx) => {
-  await addQuestions(ctx.from.id, 3);
-  await ctx.answerCbQuery("✨ Добавлено 3 вопроса!");
-  await ctx.reply("Теперь у тебя +3 вопроса 🔮");
-});
 
 bot.command("cards", async (ctx) => {
   const cards = drawCards(tarotDeck, 3);
