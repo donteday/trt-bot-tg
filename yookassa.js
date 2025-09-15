@@ -14,9 +14,6 @@ async function createPayment(userId, amount, description = "Покупка во�
         value: amount,
         currency: 'RUB'
       },
-      payment_method_data: {
-        type: 'bank_card'
-      },
       confirmation: {
         type: 'redirect',
         return_url: `${process.env.BOT_URL}`
@@ -26,6 +23,7 @@ async function createPayment(userId, amount, description = "Покупка во�
         amount: amount,
         tokensAmount: tokensAmount
       },
+      payment_method_types: ['sbp', 'sberbank', 'bank_card'],
       capture: true,
       description: description
     };

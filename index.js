@@ -1,5 +1,5 @@
 
-const { getUser, useQuestion, addQuestions, useFate } = require("./db");
+const { getUser, useQuestion, useFate } = require("./db");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
