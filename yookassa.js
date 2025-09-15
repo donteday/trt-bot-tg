@@ -23,7 +23,7 @@ async function createPayment(userId, amount, description = "Покупка во�
         amount: amount,
         tokensAmount: tokensAmount
       },
-      payment_method_types: ['sbp', 'sberbank', 'bank_card'],
+      payment_method_types: ['sbp', 'bank_card'],
       capture: true,
       description: description
     };
