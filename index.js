@@ -113,10 +113,10 @@ async function sendNoQuestionsMessage(ctx) {
   return ctx.reply(
     "🌟 Выбери пакет, чтобы продолжить 🌟",
     Markup.inlineKeyboard([
-      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
-      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
+      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
-      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")]
+      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")]      
     ])
   );
 }
@@ -125,10 +125,10 @@ bot.command("add", async (ctx) => {
   await ctx.reply(
     "🚫 У тебя закончились бесплатные вопросы.\nВыбери пакет, чтобы продолжить 🌟",
     Markup.inlineKeyboard([
-      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
-      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
+      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
-      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")]
+      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")] 
     ])
   );
   return;
