@@ -174,6 +174,15 @@ function getPaymentHistory(userId) {
   });
 }
 
+function getTotalUsers() {
+  return new Promise((resolve, reject) => {
+    db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
+      if (err) return reject(err);
+      resolve(row.count);
+    });
+  });
+}
+
 module.exports = { 
   getUser, 
   useQuestion, 
@@ -182,5 +191,6 @@ module.exports = {
   savePayment,
   updatePaymentStatus,
   addQuestionsAfterPayment,
-  getPaymentHistory
+  getPaymentHistory,
+  getTotalUsers
 };

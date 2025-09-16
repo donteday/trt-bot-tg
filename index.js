@@ -1,5 +1,5 @@
 
-const { getUser, useQuestion, useFate } = require("./db");
+const { getUser, useQuestion, useFate, getTotalUsers } = require("./db");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
@@ -116,7 +116,7 @@ async function sendNoQuestionsMessage(ctx) {
       [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
       [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
-      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")]      
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")]
     ])
   );
 }
@@ -128,7 +128,7 @@ bot.command("add", async (ctx) => {
       [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
       [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
-      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")] 
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")]
     ])
   );
   return;
@@ -226,14 +226,27 @@ async function generateMergedImage(cardsIds, userId) {
 /////////////////////////////////////
 // 5) ОБРАБОТЧИКИ КОМАНД
 /////////////////////////////////////
+bot.start(async (ctx) => {
 
-bot.start((ctx) =>
-  ctx.reply(
-    "Привет! Задай свой вопрос, и я вытащу 3 карты Таро 🔮\n" +
-    "Например: «Что мне учесть при смене работы? Что у меня будет с ним (ней)»\n\n"
+  try {
+    const totalUsers = await db.getTotalUsers();
 
-  )
-);
+    console.log(`👥 Всего пользователей: ${totalUsers}`);
+
+    // Отправляем приветствие пользователю
+    await ctx.reply(
+      `✨ Приветствую в мире AI-Таро! 🔮\n\n` +
+      "Задай свой вопрос, и я вытащу 3 карты Таро 🔮\n" +
+      "Например: «Что мне учесть при смене работы? Что у меня будет с ним (ней)»\n\n"+
+      `Просто напиши — и карты расскажут все!`
+    );
+
+  } catch (error) {
+    console.error('Ошибка при старте:', error);
+  }
+});
+
+
 
 bot.command("cards", async (ctx) => {
   const cards = drawCards(tarotDeck, 3);
