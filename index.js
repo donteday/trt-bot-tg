@@ -20,6 +20,23 @@ const bodyParser = require("body-parser");
 const app = express();
 app.use(bodyParser.json());
 
+// Глобальный обработчик непойманных ошибок
+process.on('unhandledRejection', (error) => {
+  if (error.response?.error_code === 403 && error.response?.description.includes('blocked')) {
+    console.log('⚠️ Пользователь заблокировал бота (глобальный обработчик)');
+    return; // Игнорируем ошибку блокировки
+  }
+  console.error('⚠️ Непойманная ошибка:', error);
+});
+
+process.on('uncaughtException', (error) => {
+  if (error.response?.error_code === 403 && error.response?.description.includes('blocked')) {
+    console.log('⚠️ Пользователь заблокировал бота (глобальный обработчик)');
+    return;
+  }
+  console.error('⚠️ Критическая ошибка:', error);
+});
+
 app.post("/yookassa-webhook", async (req, res) => {
   const event = req.body;
 
