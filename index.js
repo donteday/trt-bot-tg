@@ -104,6 +104,12 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
       ])
     );
   } catch (error) {
+    if (error.response?.error_code === 403 && error.response?.description.includes('blocked')) {
+      console.log('⚠️ Пользователь заблокировал бота during payment:', ctx.from.id);
+      // Можно очистить его данные из БД, если нужно
+      // await db.deleteUser(ctx.from.id);
+      return; // Просто выходим, не пытаемся отвечать
+    }
     console.error('Payment error:', error);
     await ctx.reply('❌ Произошла ошибка при создании платежа. Попробуйте позже.');
   }
