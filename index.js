@@ -156,11 +156,7 @@ bot.action("get_free_questions", async (ctx) => {
   const refLink = `https://t.me/${ctx.botInfo.username}?start=ref_${code}`;
   await ctx.reply(
     `🎁 Поделись этой ссылкой с друзьями:\n${refLink}\n\n` +
-    `За каждого нового друга ты получишь +3 вопроса 🔮`,
-    Markup.inlineKeyboard([
-      // Кнопка «Поделиться», предзаполненный текст — только ссылка
-      [Markup.button.switchInlineQuery("🔗 Поделиться", refLink)]
-    ])
+    `За каждого нового друга ты получишь +3 вопроса 🔮`
   );
 
   // Подтверждаем Telegram, чтобы кнопка не мерцала
