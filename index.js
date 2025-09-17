@@ -158,7 +158,8 @@ bot.action("get_free_questions", async (ctx) => {
     `🎁 Поделись этой ссылкой с друзьями:\n${refLink}\n\n` +
     `За каждого нового друга ты получишь +3 вопроса 🔮`,
     Markup.inlineKeyboard([
-      [Markup.button.url("🔗 Поделиться", refLink)]
+      // Кнопка «Поделиться», предзаполненный текст — только ссылка
+      [Markup.button.switchInline("🔗 Поделиться", refLink)]
     ])
   );
 
