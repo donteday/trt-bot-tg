@@ -387,7 +387,7 @@ bot.on("text", async (ctx) => {
   const userId = ctx.from.id;
   const userState = userStates.get(userId);
   const question = (ctx.message?.text || "").trim();
-  console.log(ctx.from.username, question);
+  console.log(ctx.from.username, "User message");
 
   if (userState && userState.action === 'buy_questions') {
     const email = ctx.message.text.trim();
