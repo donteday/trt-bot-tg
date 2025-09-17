@@ -139,7 +139,7 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
 
 async function sendNoQuestionsMessage(ctx) {
   return ctx.reply(
-    "🌟 Выбери пакет, чтобы продолжить 🌟",
+    "🌟 Закончились вопросы, выбери пакет, чтобы продолжить 🌟",
     Markup.inlineKeyboard([
       [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
