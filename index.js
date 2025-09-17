@@ -16,6 +16,7 @@ const bot = new Telegraf(TELEGRAM_TOKEN);
 
 const express = require("express");
 const bodyParser = require("body-parser");
+const { handleStart } = require("./commands/start.js");
 
 const app = express();
 app.use(bodyParser.json());
@@ -250,19 +251,7 @@ async function generateMergedImage(cardsIds, userId) {
   return outputPath;
 }
 
-/////////////////////////////////////
-// 5) ОБРАБОТЧИКИ КОМАНД
-/////////////////////////////////////
-bot.start((ctx) => {
-
-  ctx.reply(
-    `✨ Приветствую в мире AI-Таро! 🔮\n\n` +
-    "Задай свой вопрос, и я вытащу 3 карты Таро 🔮\n" +
-    "Например: «Что мне учесть при смене работы? Что у меня будет с ним (ней)»\n\n" +
-    `Просто напиши — и карты расскажут все!`
-  );
-
-});
+bot.start(handleStart);
 
 
 
