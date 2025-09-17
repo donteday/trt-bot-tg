@@ -144,7 +144,8 @@ async function sendNoQuestionsMessage(ctx) {
       [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
       [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
-      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")]
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
+      [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
   );
 }
