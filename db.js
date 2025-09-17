@@ -1,8 +1,31 @@
 const sqlite3 = require("sqlite3").verbose();
 const db = new sqlite3.Database("tarot.db");
 
+function addColumnIfNotExists(table, column, type, defaultValue = null) {
+  return new Promise((resolve, reject) => {
+    db.all(`PRAGMA table_info(${table})`, (err, rows) => {
+      if (err) return reject(err);
+
+      const exists = rows.some(r => r.name === column);
+      if (!exists) {
+        let sql = `ALTER TABLE ${table} ADD COLUMN ${column} ${type}`;
+        if (defaultValue !== null) {
+          sql += ` DEFAULT ${defaultValue}`;
+        }
+        db.run(sql, (err2) => {
+          if (err2) return reject(err2);
+          console.log(`✅ Added column ${column} to ${table}`);
+          resolve(true);
+        });
+      } else {
+        resolve(false); // колонка уже есть
+      }
+    });
+  });
+}
+
 // Создание таблицы пользователей
-db.serialize(() => {
+db.serialize(async () => {
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       userId INTEGER PRIMARY KEY,
@@ -15,7 +38,7 @@ db.serialize(() => {
       paymentDate DATETIME DEFAULT NULL
     )
   `);
-  
+
   // Таблица для хранения истории платежей
   db.run(`
     CREATE TABLE IF NOT EXISTS payments (
@@ -30,6 +53,11 @@ db.serialize(() => {
       FOREIGN KEY (userId) REFERENCES users (userId)
     )
   `);
+
+  // Автоматическая миграция (добавляем новые колонки при необходимости)
+  await addColumnIfNotExists("users", "referral_code", "TEXT");
+  await addColumnIfNotExists("users", "referrals_count", "INTEGER", 0);
+  await addColumnIfNotExists("users", "invited_by", "TEXT"); // кто пригласил
 });
 
 // Получить данные пользователя
@@ -67,7 +95,7 @@ function updateUserEmail(userId, email) {
 function savePayment(userId, paymentData) {
   return new Promise((resolve, reject) => {
     const { id, amount, status, description, email } = paymentData;
-    
+
     // Обновляем пользователя
     db.run(
       `UPDATE users SET 
@@ -79,7 +107,7 @@ function savePayment(userId, paymentData) {
       [id, status, amount.value, userId],
       function (err) {
         if (err) return reject(err);
-        
+
         // Сохраняем в историю платежей с email
         db.run(
           `INSERT INTO payments (userId, paymentId, amount, status, description, customer_email) 
@@ -103,7 +131,7 @@ function updatePaymentStatus(paymentId, status) {
       [status, paymentId],
       function (err) {
         if (err) return reject(err);
-        
+
         // Также обновляем в истории платежей
         db.run(
           "UPDATE payments SET status = ? WHERE paymentId = ?",
@@ -183,14 +211,80 @@ function getTotalUsers() {
   });
 }
 
-module.exports = { 
-  getUser, 
-  useQuestion, 
-  useFate, 
+function generateReferralCode() {
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+}
+
+// Получить или создать реферальный код
+async function getOrCreateReferralCode(userId) {
+  return new Promise((resolve, reject) => {
+    db.get("SELECT referral_code FROM users WHERE userId = ?", [userId], (err, row) => {
+      if (err) return reject(err);
+
+      if (row && row.referral_code) {
+        resolve(row.referral_code);
+      } else {
+        const newCode = generateReferralCode();
+        db.run(
+          "UPDATE users SET referral_code = ? WHERE userId = ?",
+          [newCode, userId],
+          function (err) {
+            if (err) return reject(err);
+            resolve(newCode);
+          }
+        );
+      }
+    });
+  });
+}
+
+function rewardReferrer(referralCode) {
+  return new Promise((resolve, reject) => {
+    if (!referralCode) return resolve(false);
+
+    db.get("SELECT userId FROM users WHERE referral_code = ?", [referralCode], (err, row) => {
+      if (err) return reject(err);
+      if (!row) return resolve(false);
+
+      const referrerId = row.userId;
+      db.run(
+        "UPDATE users SET questionsLeft = questionsLeft + 3, referrals_count = referrals_count + 1 WHERE userId = ?",
+        [referrerId],
+        function (err2) {
+          if (err2) return reject(err2);
+          resolve(referrerId);
+        }
+      );
+    });
+  });
+}
+
+// Сохраняем кто пригласил нового пользователя
+function setInvitedBy(userId, referralCode) {
+  return new Promise((resolve, reject) => {
+    db.run(
+      "UPDATE users SET invited_by = ? WHERE userId = ?",
+      [referralCode, userId],
+      function (err) {
+        if (err) return reject(err);
+        resolve(this.changes > 0);
+      }
+    );
+  });
+}
+
+module.exports = {
+  getUser,
+  useQuestion,
+  useFate,
   updateUserEmail,
   savePayment,
   updatePaymentStatus,
   addQuestionsAfterPayment,
   getPaymentHistory,
-  getTotalUsers
+  getTotalUsers,
+  getOrCreateReferralCode,
+  generateReferralCode,
+  rewardReferrer,
+  setInvitedBy
 };

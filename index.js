@@ -149,6 +149,17 @@ async function sendNoQuestionsMessage(ctx) {
   );
 }
 
+bot.action("get_free_questions", async (ctx) => {
+  const userId = ctx.from.id;
+  const code = await db.getOrCreateReferralCode(userId);
+
+  const refLink = `https://t.me/${ctx.botInfo.username}?start=ref_${code}`;
+  await ctx.reply(
+    `🎁 Поделись этой ссылкой с друзьями:\n${refLink}\n\n` +
+    `За каждого нового друга ты получишь +3 вопроса 🔮`
+  );
+});
+
 bot.command("add", async (ctx) => {
   await ctx.reply(
     "🚫 У тебя закончились бесплатные вопросы.\nВыбери пакет, чтобы продолжить 🌟",
@@ -156,7 +167,8 @@ bot.command("add", async (ctx) => {
       [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
       [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
-      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")]
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
+      [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")] 
     ])
   );
   return;
@@ -251,7 +263,38 @@ async function generateMergedImage(cardsIds, userId) {
   return outputPath;
 }
 
-bot.start(handleStart);
+// bot.start(handleStart);
+bot.start(async (ctx) => {
+  const userId = ctx.from.id;
+  const text = ctx.message.text || "";
+
+  // 1) Сначала создаем пользователя, если нет
+  const user = await db.getUser(userId);
+
+  // 2) Проверяем рефералку
+  if (text.includes("ref_") && !user.invited_by) { // только если еще не приглашён
+    const referralCode = text.split("ref_")[1];
+
+    const referrer = await db.getUserByReferralCode(referralCode).catch(() => null);
+    if (referrer && referrer.userId !== userId) {
+      await db.rewardReferrer(referralCode);
+      await db.setInvitedBy(userId, referralCode);
+
+      ctx.telegram.sendMessage(
+        referrer.userId,
+        `🎉 Новый пользователь зарегистрировался по твоей ссылке! Ты получил +3 вопроса 🔮`
+      );
+    }
+  }
+
+  ctx.reply(
+    `✨ Приветствую в мире AI-Таро! 🔮\n\n` +
+    "Задай свой вопрос, и я вытащу 3 карты Таро 🔮\n" +
+    "Например: «Что мне учесть при смене работы? Что у меня будет с ним (ней)»\n\n" +
+    `Просто напиши — и карты расскажут все!`
+  );
+});
+
 
 
 
