@@ -273,6 +273,19 @@ function setInvitedBy(userId, referralCode) {
   });
 }
 
+function getUserByReferralCode(referralCode) {
+  return new Promise((resolve, reject) => {
+    db.get(
+      "SELECT * FROM users WHERE referral_code = ?",
+      [referralCode],
+      (err, row) => {
+        if (err) return reject(err);
+        resolve(row || null);
+      }
+    );
+  });
+}
+
 module.exports = {
   getUser,
   useQuestion,
@@ -286,5 +299,6 @@ module.exports = {
   getOrCreateReferralCode,
   generateReferralCode,
   rewardReferrer,
-  setInvitedBy
+  setInvitedBy,
+  getUserByReferralCode
 };
