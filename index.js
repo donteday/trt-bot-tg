@@ -156,8 +156,15 @@ bot.action("get_free_questions", async (ctx) => {
   const refLink = `https://t.me/${ctx.botInfo.username}?start=ref_${code}`;
   await ctx.reply(
     `🎁 Поделись этой ссылкой с друзьями:\n${refLink}\n\n` +
-    `За каждого нового друга ты получишь +3 вопроса 🔮`
+    `За каждого нового друга ты получишь +3 вопроса 🔮`,
+    Markup.inlineKeyboard([
+      // Кнопка "Поделиться"
+      [Markup.button.switchToChat("🔗 Поделиться", refLink)]
+    ])
   );
+
+  // Подтверждаем Telegram, чтобы кнопка не мерцала
+  await ctx.answerCbQuery();
 });
 
 bot.command("add", async (ctx) => {
