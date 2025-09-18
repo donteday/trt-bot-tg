@@ -65,12 +65,28 @@ function getUser(userId) {
   return new Promise((resolve, reject) => {
     db.get("SELECT * FROM users WHERE userId = ?", [userId], (err, row) => {
       if (err) return reject(err);
+      
       if (!row) {
-        db.run("INSERT INTO users (userId, questionsLeft, fateUsed) VALUES (?, 3, 0)", [userId], function (err2) {
-          if (err2) return reject(err2);
-          resolve({ userId, questionsLeft: 3, fateUsed: 0 });
-        });
+        // Пользователя нет - создаем нового с обработкой конфликта
+        db.run(
+          "INSERT OR IGNORE INTO users (userId, questionsLeft, fateUsed) VALUES (?, 3, 0)", 
+          [userId], 
+          function (err2) {
+            if (err2) {
+              // Если произошла ошибка (например, пользователь уже добавился в другом запросе)
+              // Пробуем снова найти пользователя
+              db.get("SELECT * FROM users WHERE userId = ?", [userId], (err3, row2) => {
+                if (err3) return reject(err3);
+                resolve(row2 || { userId, questionsLeft: 3, fateUsed: 0 });
+              });
+            } else {
+              // Успешно создали нового пользователя
+              resolve({ userId, questionsLeft: 3, fateUsed: 0 });
+            }
+          }
+        );
       } else {
+        // Пользователь уже существует
         resolve(row);
       }
     });
