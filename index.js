@@ -18,6 +18,21 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const { handleStart } = require("./commands/start.js");
 
+bot.catch((err, ctx) => {
+  console.error(`❌ Ошибка в апдейте для ${ctx.updateType}`, err);
+
+  // Если бот пытается писать пользователю, который его заблокировал
+  if (err.response && err.response.error_code === 403) {
+    console.log(`🚫 Пользователь ${ctx.from?.id} заблокировал бота`);
+    return;
+  }
+
+  // Другие ошибки
+  console.log("⚠️ Необработанная ошибка:", err.description || err.message);
+});
+
+
+
 const app = express();
 app.use(bodyParser.json());
 
