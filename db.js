@@ -58,6 +58,11 @@ db.serialize(async () => {
   await addColumnIfNotExists("users", "referral_code", "TEXT");
   await addColumnIfNotExists("users", "referrals_count", "INTEGER", 0);
   await addColumnIfNotExists("users", "invited_by", "TEXT"); // кто пригласил
+  await addColumnIfNotExists("users", "collected_cards", "TEXT", '[]'); // коллекция
+  await addColumnIfNotExists("users", "completed_suits", "TEXT", '[]'); // коллекция
+
+  
+
 });
 
 // Получить данные пользователя
@@ -302,6 +307,26 @@ function getUserByReferralCode(referralCode) {
   });
 }
 
+const getUserData = (userId, callback) => {
+  db.get(`SELECT * FROM users WHERE userId = ?`, [userId], callback);
+};
+
+const updateUserWithBonus = (userId, bonus, collectedCards, completedSuits, callback) => {
+  db.run(
+    `UPDATE users SET questionsLeft = questionsLeft + ?, collected_cards = ?, completed_suits = ? WHERE userId = ?`,
+    [bonus, collectedCards, completedSuits, userId],
+    callback
+  );
+};
+
+const updateUserCards = (userId, collectedCards, callback) => {
+  db.run(
+    `UPDATE users SET collected_cards = ? WHERE userId = ?`,
+    [collectedCards, userId],
+    callback
+  );
+};
+
 module.exports = {
   getUser,
   useQuestion,
@@ -316,5 +341,8 @@ module.exports = {
   generateReferralCode,
   rewardReferrer,
   setInvitedBy,
-  getUserByReferralCode
+  getUserByReferralCode,
+  getUserData,
+  updateUserWithBonus,
+  updateUserCards
 };

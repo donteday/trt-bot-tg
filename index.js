@@ -1,5 +1,5 @@
 
-const { getUser, useQuestion, useFate, getTotalUsers } = require("./db");
+const { getUser, useQuestion, getUserData, updateUserWithBonus, updateUserCards } = require("./db");
 const sharp = require("sharp");
 const path = require("path");
 const fs = require("fs");
@@ -16,7 +16,6 @@ const bot = new Telegraf(TELEGRAM_TOKEN);
 
 const express = require("express");
 const bodyParser = require("body-parser");
-const { handleStart } = require("./commands/start.js");
 
 bot.catch((err, ctx) => {
   console.error(`❌ Ошибка в апдейте для ${ctx.updateType}`, err);
@@ -31,7 +30,11 @@ bot.catch((err, ctx) => {
   console.log("⚠️ Необработанная ошибка:", err.description || err.message);
 });
 
-
+bot.telegram.setMyCommands([
+  { command: 'price', description: '💎 Узнать цены' },
+  { command: 'balance', description: '💰 Мой баланс' },
+  { command: 'mycollection', description: '📚 Моя коллекция' }
+]);
 
 const app = express();
 app.use(bodyParser.json());
@@ -179,15 +182,15 @@ bot.action("get_free_questions", async (ctx) => {
   await ctx.answerCbQuery();
 });
 
-bot.command("add", async (ctx) => {
+bot.command("price", async (ctx) => {
   await ctx.reply(
-    "🚫 У тебя закончились бесплатные вопросы.\nВыбери пакет, чтобы продолжить 🌟",
+    "Выбери пакет, чтобы продолжить.🌟",
     Markup.inlineKeyboard([
       [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
       [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
       [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
-      [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")] 
+      [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
   );
   return;
@@ -195,7 +198,6 @@ bot.command("add", async (ctx) => {
 
 // Состояния для сбора email
 const userStates = new Map();
-
 
 function drawCards(tarotDeck) {
   const selected = [];
@@ -281,6 +283,88 @@ async function generateMergedImage(cardsIds, userId) {
   fs.writeFileSync(outputPath, data);
   return outputPath;
 }
+const checkCollections = (userId, newCards) => {
+  return new Promise((resolve, reject) => {
+    getUserData(userId, (err, user) => {
+      if (err || !user) return resolve(null);
+
+      // Данные пользователя
+      let cards = user.collected_cards ? JSON.parse(user.collected_cards) : [];
+      let completedSuits = user.completed_suits ? JSON.parse(user.completed_suits) : [];
+
+      let newBonuses = [];
+      let gotNewCards = false;
+
+      // Добавляем новые карты
+      for (const card of newCards) {
+        if (!cards.find(c => c.id === card.id)) {
+          cards.push(card);
+          gotNewCards = true;
+        }
+      }
+
+      // Если нет новых карт - выходим
+      if (!gotNewCards) return resolve(null);
+
+      // Проверяем масти на завершение
+      const suits = ['Major', 'Wands', 'Cups', 'Swords', 'Pentacles'];
+
+      for (const suit of suits) {
+        const allInSuit = tarotDeck.filter(c => c.suit === suit);
+        const userInSuit = cards.filter(c => c.suit === suit);
+
+        // Если масть собрана И еще не награждали
+        if (userInSuit.length === allInSuit.length && !completedSuits.includes(suit)) {
+          newBonuses.push(suit);
+          completedSuits.push(suit);
+        }
+      }
+
+      // Начисляем бонусы если есть новые завершенные масти
+      if (newBonuses.length > 0) {
+        let bonus = newBonuses.length * 20; // +20 за каждую масть
+
+        // +50 если собраны ВСЕ масти
+        if (completedSuits.length === 5) {
+          bonus = 50;
+        }
+
+        updateUserWithBonus(
+          userId,
+          bonus,
+          JSON.stringify(cards),
+          JSON.stringify(completedSuits),
+          (err) => {
+            if (err) resolve(null);
+            else resolve({
+              bonuses: newBonuses,
+              totalBonus: bonus,
+              message: bonus === 50
+                ? '🎉 ВАУ! Вы собрали ВСЕ масти! +50 запросов! 🏆'
+                : `🎉 Собраны масти: ${newBonuses.map(s => getSuitName(s)).join(', ')}! +${bonus} запросов!`
+            });
+          }
+        );
+      } else {
+        // Просто сохраняем новые карты
+        updateUserCards(userId, JSON.stringify(cards), (err) => {
+          resolve(null);
+        });
+      }
+    });
+  });
+};
+
+const getSuitName = (suit) => {
+  const names = {
+    'Major': 'Старшие Арканы',
+    'Wands': 'Жезлы',
+    'Cups': 'Кубки',
+    'Swords': 'Мечи',
+    'Pentacles': 'Пентакли'
+  };
+  return names[suit] || suit;
+};
 
 // bot.start(handleStart);
 bot.start(async (ctx) => {
@@ -309,18 +393,40 @@ bot.start(async (ctx) => {
   ctx.reply(
     `✨ Приветствую в мире AI-Таро! 🔮\n\n` +
     "Задай свой вопрос, и я вытащу 3 карты Таро 🔮\n" +
-    "Например: «Что мне учесть при смене работы? Что у меня будет с ним (ней)»\n\n" +
-    `Просто напиши — и карты расскажут все!`
+    "Например: «Что мне учесть при смене работы? Что у меня будет с ним (ней)»\n" +
+    `Просто напиши — и карты расскажут все!\n\n` +
+
+    "Собирай коллекции карт, подробнее /mycollection💎 \n+20 запросов за масть карт \n+50 запросов за все масти!"
   );
 });
 
+bot.command('mycollection', (ctx) => {
+  const userId = ctx.from.id;
 
+  getUserData(userId, (err, user) => {
 
+    if (err || !user) return ctx.reply('Ошибка загрузки коллекции');
 
-bot.command("cards", async (ctx) => {
-  const cards = drawCards(tarotDeck, 3);
-  const header = "Твои карты:\n" + cards.map(formatCardLine).join("\n");
-  await ctx.reply(header);
+    let message = 'Коллекционируйте карты, получите +20 запросов за каждую собранную масть и +50 за все собранные масти! 🃏\n\n📚 Ваша коллекция карт:\n\n';
+
+    const cards = user.collected_cards ? JSON.parse(user.collected_cards) : [];
+    const completedSuits = user.completed_suits ? JSON.parse(user.completed_suits) : [];
+
+    const suits = ['Major', 'Wands', 'Cups', 'Swords', 'Pentacles'];
+
+    suits.forEach(suit => {
+      const total = tarotDeck.filter(c => c.suit === suit).length;
+      const collected = cards.filter(c => c.suit === suit).length;
+      const isCompleted = completedSuits.includes(suit);
+
+      message += `${isCompleted ? '✅' : '📖'} ${getSuitName(suit)}: ${collected}/${total}\n`;
+    });
+
+    message += `\n🎯 Собрано мастей: ${completedSuits.length}/5`;
+    message += `\n❓ Осталось запросов: ${user.questionsLeft || 0}`;
+
+    ctx.reply(message);
+  });
 });
 
 // команда: баланс
@@ -455,7 +561,14 @@ bot.on("text", async (ctx) => {
     // 1) тянем карты
     const cards = drawCards(tarotDeck);
     const cardsIds = cards.map(c => c.id);
+
+    const collectionResult = await checkCollections(userId, cards);
+
+
     await ctx.reply("🃏 Твои карты:\n" + cards.map((c) => `${c.name} ${SUIT_EMOJI[c.suit]}`).join(", "));
+    if (collectionResult) {
+      await ctx.reply(collectionResult.message);
+    }
     const mergedImage = await generateMergedImage(cardsIds, userId);
 
     try {
@@ -508,6 +621,7 @@ bot.on("text", async (ctx) => {
 
     // Получаем ответ со стримингом
     const interpretation = await askOpenAIStreaming(prompt, handleStream, handleComplete);
+
     if (user.questionsLeft <= 0) {
       sendNoQuestionsMessage(ctx);
       return;
@@ -519,13 +633,9 @@ bot.on("text", async (ctx) => {
   }
 });
 
-/////////////////////////////////////
-// 6) ЗАПУСК
-/////////////////////////////////////
 bot.launch().then(() => {
   console.log("✅ Tarot Bot запущен");
 });
 
-// Корректная остановка на хостингах (Heroku/Render/Vercel functions и т.п.)
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));
