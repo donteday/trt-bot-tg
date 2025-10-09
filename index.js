@@ -169,17 +169,25 @@ async function sendNoQuestionsMessage(ctx) {
 }
 
 bot.action("get_free_questions", async (ctx) => {
-  const userId = ctx.from.id;
-  const code = await db.getOrCreateReferralCode(userId);
+  try {
+    await ctx.answerCbQuery().catch(err => {
+      if (err.response?.error_code === 400) return; // Игнорируем старые callback
+      throw err;
+    });
 
-  const refLink = `https://t.me/${ctx.botInfo.username}?start=ref_${code}`;
-  await ctx.reply(
-    `🎁 Поделись этой ссылкой с друзьями:\n${refLink}\n\n` +
-    `За каждого нового друга ты получишь +3 вопроса 🔮`
-  );
+    // Теперь делаем долгие операции
+    const userId = ctx.from.id;
+    const code = await db.getOrCreateReferralCode(userId);
 
-  // Подтверждаем Telegram, чтобы кнопка не мерцала
-  await ctx.answerCbQuery();
+    const refLink = `https://t.me/${ctx.botInfo.username}?start=ref_${code}`;
+    await ctx.reply(
+      `🎁 Поделись этой ссылкой с друзьями:\n${refLink}\n\n` +
+      `За каждого нового друга ты получишь +3 вопроса 🔮`
+    );
+
+  } catch (error) {
+    console.error('Error in get_free_questions:', error);
+  }
 });
 
 bot.command("price", async (ctx) => {
