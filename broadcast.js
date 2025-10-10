@@ -1,6 +1,7 @@
 require('dotenv').config();
 const sqlite3 = require('sqlite3').verbose();
 const { Telegraf } = require('telegraf');
+const fs = require('fs');
 
 // Инициализация бота
 const bot = new Telegraf(process.env.TELEGRAM_TOKEN);
@@ -62,7 +63,12 @@ async function sendBroadcast(message) {
 }
 
 // Запуск из командной строки
-const message = process.argv[2];
+
+let message = process.argv[2];
+if (process.argv[2] === '--file') {
+  message = fs.readFileSync(process.argv[3], 'utf8');
+  // отправляем message
+} else
 
 if (!message) {
   console.log('❌ Укажите сообщение для рассылки:');

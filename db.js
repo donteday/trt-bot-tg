@@ -57,11 +57,12 @@ db.serialize(async () => {
   // Автоматическая миграция (добавляем новые колонки при необходимости)
   await addColumnIfNotExists("users", "referral_code", "TEXT");
   await addColumnIfNotExists("users", "referrals_count", "INTEGER", 0);
+  await addColumnIfNotExists("users", "response_style", "INTEGER", 1);
   await addColumnIfNotExists("users", "invited_by", "TEXT"); // кто пригласил
   await addColumnIfNotExists("users", "collected_cards", "TEXT", '[]'); // коллекция
   await addColumnIfNotExists("users", "completed_suits", "TEXT", '[]'); // коллекция
 
-  
+
 
 });
 
@@ -70,12 +71,12 @@ function getUser(userId) {
   return new Promise((resolve, reject) => {
     db.get("SELECT * FROM users WHERE userId = ?", [userId], (err, row) => {
       if (err) return reject(err);
-      
+
       if (!row) {
         // Пользователя нет - создаем нового с обработкой конфликта
         db.run(
-          "INSERT OR IGNORE INTO users (userId, questionsLeft, fateUsed) VALUES (?, 3, 0)", 
-          [userId], 
+          "INSERT OR IGNORE INTO users (userId, questionsLeft, fateUsed) VALUES (?, 3, 0)",
+          [userId],
           function (err2) {
             if (err2) {
               // Если произошла ошибка (например, пользователь уже добавился в другом запросе)
@@ -327,6 +328,42 @@ const updateUserCards = (userId, collectedCards, callback) => {
   );
 };
 
+// Функция изменения стиля ответа
+async function setUserResponseStyle(userId, styleId) {
+  try {
+    await new Promise((resolve, reject) => {
+      db.run(
+        "INSERT OR REPLACE INTO users (userId, response_style) VALUES (?, ?)",
+        [userId, styleId],
+        function(err) {
+          if (err) reject(err);
+          else resolve(this);
+        }
+      );
+    });
+    return true;
+  } catch (error) {
+    console.error('Error setting response style:', error);
+    return false;
+  }
+}
+
+// Функция получения стиля пользователя
+async function getUserResponseStyle(userId) {
+  try {
+    const row = await new Promise((resolve, reject) => {
+      db.get("SELECT response_style FROM users WHERE userId = ?", [userId], (err, row) => {
+        if (err) reject(err);
+        else resolve(row);
+      });
+    });
+    return row ? row.response_style : 1; // По умолчанию стиль 1
+  } catch (error) {
+    console.error('Error getting response style:', error);
+    return 1;
+  }
+}
+
 module.exports = {
   getUser,
   useQuestion,
@@ -344,5 +381,7 @@ module.exports = {
   getUserByReferralCode,
   getUserData,
   updateUserWithBonus,
-  updateUserCards
+  updateUserCards,
+  setUserResponseStyle,
+  getUserResponseStyle
 };

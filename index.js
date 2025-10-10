@@ -16,6 +16,8 @@ const bot = new Telegraf(TELEGRAM_TOKEN);
 
 const express = require("express");
 const bodyParser = require("body-parser");
+const sendChangeStyleMessage = require("./commands/style.js");
+const { styleConfig } = require("./configs/configs.js");
 
 bot.catch((err, ctx) => {
   console.error(`❌ Ошибка в апдейте для ${ctx.updateType}`, err);
@@ -33,7 +35,8 @@ bot.catch((err, ctx) => {
 bot.telegram.setMyCommands([
   { command: 'price', description: '💎 Узнать цены' },
   { command: 'balance', description: '💰 Мой баланс' },
-  { command: 'mycollection', description: '📚 Моя коллекция' }
+  { command: 'mycollection', description: '📚 Моя коллекция' },
+  { command: 'style', description: '🎭 Стиль ответов' },
 ]);
 
 const app = express();
@@ -101,9 +104,9 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
   const packageId = parseInt(ctx.match[1]);
   const packages = {
     1: { amount: 3, price: 49 },
-    2: { amount: 10, price: 99 },
-    3: { amount: 40, price: 299 },
-    4: { amount: 100, price: 499 }
+    2: { amount: 10, price: 79 },
+    3: { amount: 40, price: 239 },
+    4: { amount: 100, price: 399 }
   };
   const selectedPackage = packages[packageId];
 
@@ -155,18 +158,35 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
   }
 });
 
+bot.action(/style_(\d+)/, async (ctx) => {
+  const userId = ctx.from.id;
+  const styleId = parseInt(ctx.match[1]);
+  const selectedStyle = styleConfig[styleId];
+
+  try {
+    await db.setUserResponseStyle(userId, styleId);
+    await ctx.editMessageText(
+      `✅ Выбран стиль: ${selectedStyle}\n\nТеперь все ответы будут в этом формате ✨`
+    );
+  } catch (error) {
+    console.log('Error changing style:', error);
+    await ctx.answerCbQuery('❌ Ошибка при смене стиля');
+  }
+});
+
 async function sendNoQuestionsMessage(ctx) {
   return ctx.reply(
     "🌟 Закончились вопросы, выбери пакет, чтобы продолжить 🌟",
     Markup.inlineKeyboard([
-      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
-      [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
-      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
-      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
+      [Markup.button.callback("💎 100 запросов — 399₽ (-20%)", "buy_questions_4")],
+      [Markup.button.callback("🌌 40 запросов — 239₽ (-20%)", "buy_questions_3")],
+      [Markup.button.callback("🔮 10 запросов — 79₽ (-20%)", "buy_questions_2")],
       [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
   );
 }
+
+
 
 bot.action("get_free_questions", async (ctx) => {
   try {
@@ -192,16 +212,18 @@ bot.action("get_free_questions", async (ctx) => {
 
 bot.command("price", async (ctx) => {
   await ctx.reply(
-    "Выбери пакет, чтобы продолжить.🌟",
+    "Выбери пакет запросов🌟",
     Markup.inlineKeyboard([
-      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
-      [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
-      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
-      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
+      [Markup.button.callback("💎 100 запросов — 399₽ (-20%)", "buy_questions_4")],
+      [Markup.button.callback("🌌 40 запросов — 239₽ (-20%)", "buy_questions_3")],
+      [Markup.button.callback("🔮 10 запросов — 79₽ (-20%)", "buy_questions_2")],
       [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
   );
   return;
+});
+bot.command("style", async (ctx) => {
+  await sendChangeStyleMessage(ctx);
 });
 
 // Состояния для сбора email
@@ -236,28 +258,55 @@ function isValidQuestion(text) {
 }
 
 // Формирование промпта для ИИ
-function buildPrompt(question, cards) {
+function buildPrompt(question, cards, styleId = 1) {
   const list = cards
-    .map(
-      (c, i) =>
-        `${i + 1}. ${c.name}`
-    )
+    .map((c, i) => `${i + 1}. ${c.name}`)
     .join("\n");
 
+  // Конфигурация стилей
+  const stylePrompts = {
+    1: `🔮 **СТАНДАРТНЫЙ СТИЛЬ**
+Создай классическую интерпретацию с духовными инсайтами. 
+Используй мудрый, эмпатичный тон таролога-проводника.
+Важно: глубина, эмпатия, духовные инсайты`,
+
+    2: `💫 **МОТИВАЦИОННЫЙ СТИЛЬ**  
+Создай вдохновляющую интерпретацию, которая зарядит на действия.
+Используй энергичный, поддерживающий тон коуча.
+Важно: мотивация, конкретные шаги, вера в себя`,
+
+    3: `😈 **ЖЕСТКИЙ СТИЛЬ**
+Создай прямолинейную интерпритацию с большим количеством юмора и матами.
+Используй честный, юморной тон с подколами и мемами.
+Важно: правда без сахара, конкретика, вызов к действию`,
+
+    4: `👯 **СТИЛЬ ЛУЧШЕЙ ПОДРУГИ**
+Создай теплую, доверительную интерпретацию, как будто вы на кухне за бутылкой вина.
+Используй неформальный, поддерживающий тон с кучей юмора.
+Важно: забота, юмор, практические советы "как для подруги"`
+  };
+
+  const styleInstruction = stylePrompts[styleId] || stylePrompts[1];
+
   return `
-Ты — мудрый, эмапатичный таролог-проводник с глубокой интуицией. Твоя задача — не просто описать карты, а создать целостную историю, которая даст клиенту ясность и поддержку.
+Ты — таролог, работающий в выбранном стиле. Адаптируйся под тон и подход.
+
+**СТИЛЬ ОТВЕТА:**
+${styleInstruction}
+
 **КОНТЕКСТ:** Пользователь уже обратился к тебе ранее. Не приветствуй его снова, сразу переходи к сути.
+
 Вопрос: ${question}
 Карты: ${list}
 
-Создай интерпретацию, которая:
+Создай интерпретацию в выбранном стиле, которая:
 🌟 Начинается сразу с общего послания расклада
-📖 Объясняет каждую карту в контексте вопроса
-🔄 Показывает диалог между картами — как они дополняют друг друга
+📖 Объясняет каждую карту в контексте вопроса  
+🔄 Показывает диалог между картами
 💡 Даёт практические подсказки для действий
 🌈 Завершается ободряющим выводом
 
-**ВАЖНО:** Избегай шаблонных фраз и общих мест. До 1000 слов и не более 3000 символов. Говори правду, но с заботой. Используй немного эмодзи для передачи эмоций и структуры, но не переусердствуй.
+**ВАЖНО:** Строго соблюдай выбранный стиль общения, но отвечай не шаблонно. Отвечай подробно не более 4000 символов. Используй эмодзи соответственно стилю, но не используй ** в оформлении.
 `.trim();
 }
 
@@ -404,7 +453,8 @@ bot.start(async (ctx) => {
     "Например: «Что мне учесть при смене работы? Что у меня будет с ним (ней)»\n" +
     `Просто напиши — и карты расскажут все!\n\n` +
 
-    "Собирай коллекции карт, подробнее /mycollection💎 \n+20 запросов за масть карт \n+50 запросов за все масти!"
+    "💎 Собирай коллекции карт и получай дополнительные запросы, подробнее /mycollection \n" +
+    "🎭 Выбирай свой стиль ответа бота /style💎"
   );
 });
 
@@ -469,7 +519,7 @@ async function askOpenAIStreaming(prompt, onChunk, onComplete) {
           { role: "user", content: prompt },
         ],
         stream: true, // Включаем стриминг!
-        temperature: 0.7,
+        temperature: 1,
         max_tokens: 2000,
       }),
     });
@@ -589,8 +639,8 @@ bot.on("text", async (ctx) => {
     const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
     let currentText = "🔮\n\n";
     let lastUpdate = Date.now();
-
-    const prompt = buildPrompt(question, cards);
+    const userStyle = await db.getUserResponseStyle(userId);
+    const prompt = buildPrompt(question, cards, userStyle);
 
     // Функция для обработки стриминга
     const handleStream = async (chunk) => {
