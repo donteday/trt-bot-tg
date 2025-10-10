@@ -565,6 +565,7 @@ async function askOpenAIStreaming(prompt, onChunk, onComplete) {
 }
 const userStreams = new Map(); 
 
+
 bot.on("text", async (ctx) => {
   const userId = ctx.from.id;
   const question = (ctx.message?.text || "").trim();
@@ -585,7 +586,7 @@ bot.on("text", async (ctx) => {
     }
 
     try {
-      await db.updateUserEmail(userId, email); // предполагаем, что updateUserEmail теперь async
+      db.updateUserEmail(userId, email); // предполагаем, что updateUserEmail теперь async
       userStates.delete(userId);
       await ctx.reply(`✅ Email сохранен!\n\n`);
       sendNoQuestionsMessage(ctx);
@@ -600,13 +601,13 @@ bot.on("text", async (ctx) => {
     return ctx.reply("❌ Пожалуйста, задай корректный вопрос (не менее 2 слов).");
   }
 
-  const user = await getUser(userId);
+  const user = getUser(userId);
 
   if (user.questionsLeft <= 0) {
     return sendNoQuestionsMessage(ctx);
   }
 
-  const ok = await useQuestion(userId);
+  const ok = useQuestion(userId);
   if (!ok) {
     return ctx.reply("🚫 У тебя нет доступных вопросов.");
   }
@@ -615,7 +616,7 @@ bot.on("text", async (ctx) => {
     // Карты и коллекции
     const cards = drawCards(tarotDeck);
     const cardsIds = cards.map(c => c.id);
-    const collectionResult = await checkCollections(userId, cards);
+    const collectionResult = checkCollections(userId, cards);
 
     await ctx.reply("🃏 Твои карты:\n" + cards.map(c => `${c.name} ${SUIT_EMOJI[c.suit]}`).join(", "));
     if (collectionResult) await ctx.reply(collectionResult.message);
@@ -628,7 +629,7 @@ bot.on("text", async (ctx) => {
     const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
     userStreams.set(userId, true); // отмечаем активный стрим
 
-    const userStyle = await db.getUserResponseStyle(userId);
+    const userStyle = db.getUserResponseStyle(userId);
     const prompt = buildPrompt(question, cards, userStyle);
     let currentText = "🔮\n\n";
     let lastUpdate = Date.now();
