@@ -113,7 +113,8 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
   try {
     // Получаем данные пользователя
     const user = db.getUser(userId);
-
+    console.log(user);
+    
     // Проверяем, есть ли email у пользователя
     if (!user.email) {
       await ctx.reply(
