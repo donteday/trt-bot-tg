@@ -2,7 +2,7 @@
 const { getUser, useQuestion, getUserData, updateUserWithBonus, updateUserCards } = require("./db");
 const sharp = require("sharp");
 const path = require("path");
-const fs = require('fs').promises;
+const fs = require('fs');
 const { Telegraf, Markup } = require("telegraf");
 require('dotenv').config();
 const yookassa = require('./yookassa');
@@ -623,7 +623,7 @@ bot.on("text", async (ctx) => {
 
     const mergedImage = await generateMergedImage(cardsIds, userId);
     await ctx.replyWithPhoto({ source: mergedImage });
-    await fs.unlink(mergedImage).catch(() => {});
+    await fs.unlinkSync(mergedImage);
 
     // Создаем сообщение для стриминга
     const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
