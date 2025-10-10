@@ -616,7 +616,7 @@ bot.on("text", async (ctx) => {
     // Карты и коллекции
     const cards = drawCards(tarotDeck);
     const cardsIds = cards.map(c => c.id);
-    const collectionResult = checkCollections(userId, cards);
+    const collectionResult = await checkCollections(userId, cards);
 
     await ctx.reply("🃏 Твои карты:\n" + cards.map(c => `${c.name} ${SUIT_EMOJI[c.suit]}`).join(", "));
     if (collectionResult) await ctx.reply(collectionResult.message);
