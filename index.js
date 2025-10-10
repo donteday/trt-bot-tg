@@ -489,7 +489,7 @@ bot.command('mycollection', (ctx) => {
 
 // команда: баланс
 bot.command("balance", async (ctx) => {
-  const user = await getUser(ctx.from.id);
+  const user = getUser(ctx.from.id);
   const fateStatus = user.fateUsed ? "❌ уже использована" : "✅ доступна";
   await ctx.reply(
     `📊 Баланс:\n` +
