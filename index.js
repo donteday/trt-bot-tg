@@ -82,14 +82,14 @@ app.post("/yookassa-webhook", async (req, res) => {
   res.sendStatus(200);
 });
 
-// const options = {
-//   key: fs.readFileSync(path.join(__dirname, "/cert/certificate.key")),
-//   cert: fs.readFileSync(path.join(__dirname, "/cert/certificate.crt"))
-// };
+const options = {
+  key: fs.readFileSync(path.join(__dirname, "/cert/certificate.key")),
+  cert: fs.readFileSync(path.join(__dirname, "/cert/certificate.crt"))
+};
 
-// https.createServer(options, app).listen(443, () => {
-//   console.log("🚀 HTTPS сервер слушает порт 443");
-// });
+https.createServer(options, app).listen(443, () => {
+  console.log("🚀 HTTPS сервер слушает порт 443");
+});
 
 const SUIT_EMOJI = {
   Wands: "🔥",
