@@ -2,7 +2,7 @@
 const { getUser, useQuestion, getUserData, updateUserWithBonus, updateUserCards } = require("./db");
 const sharp = require("sharp");
 const path = require("path");
-const fs = require("fs");
+const fs = require('fs').promises;
 const { Telegraf, Markup } = require("telegraf");
 require('dotenv').config();
 const yookassa = require('./yookassa');
@@ -563,133 +563,116 @@ async function askOpenAIStreaming(prompt, onChunk, onComplete) {
     throw error;
   }
 }
+const userStreams = new Map(); 
+const fs = require('fs').promises;
+
 bot.on("text", async (ctx) => {
   const userId = ctx.from.id;
-  const userState = userStates.get(userId);
   const question = (ctx.message?.text || "").trim();
-  console.log(ctx.from.username, "User message");
 
+  // Предотвращаем параллельные стримы для одного пользователя
+  if (userStreams.has(userId)) {
+    return ctx.reply("⏳ Подождите, текущий ответ ещё не готов...");
+  }
+
+  const userState = userStates.get(userId);
+
+  // Обработка email
   if (userState && userState.action === 'buy_questions') {
     const email = ctx.message.text.trim();
-
-    // Валидация email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      await ctx.reply('❌ Пожалуйста, введите корректный email адрес.');
-      return;
+      return ctx.reply('❌ Пожалуйста, введите корректный email адрес.');
     }
 
     try {
-      // Сохраняем email
-      db.updateUserEmail(userId, email);
+      await db.updateUserEmail(userId, email); // предполагаем, что updateUserEmail теперь async
       userStates.delete(userId);
       await ctx.reply(`✅ Email сохранен!\n\n`);
       sendNoQuestionsMessage(ctx);
       return;
     } catch (error) {
       console.error('Payment error:', error);
-      await ctx.reply('❌ Произошла ошибка при создании платежа. Попробуйте позже.');
+      return ctx.reply('❌ Произошла ошибка. Попробуйте позже.');
     }
   }
 
-  // Проверка вопроса
-  if (!isValidQuestion(question)) {
-    await ctx.reply("❌ Пожалуйста, задай вопрос (не менее 2 слов).");
-    return;
-  }
-  if (!question) {
-    await ctx.reply("Напиши осмысленный вопрос, чтобы я мог интерпретировать расклад 🙌");
-    return;
+  if (!question || !isValidQuestion(question)) {
+    return ctx.reply("❌ Пожалуйста, задай корректный вопрос (не менее 2 слов).");
   }
 
   const user = await getUser(userId);
 
   if (user.questionsLeft <= 0) {
-    sendNoQuestionsMessage(ctx);
-    return;
+    return sendNoQuestionsMessage(ctx);
+  }
+
+  const ok = await useQuestion(userId);
+  if (!ok) {
+    return ctx.reply("🚫 У тебя нет доступных вопросов.");
   }
 
   try {
-    const ok = await useQuestion(userId);
-    if (!ok) {
-      await ctx.reply("🚫 У тебя нет доступных вопросов.");
-      return;
-    }
-
-    // 1) тянем карты
+    // Карты и коллекции
     const cards = drawCards(tarotDeck);
     const cardsIds = cards.map(c => c.id);
-
     const collectionResult = await checkCollections(userId, cards);
 
+    await ctx.reply("🃏 Твои карты:\n" + cards.map(c => `${c.name} ${SUIT_EMOJI[c.suit]}`).join(", "));
+    if (collectionResult) await ctx.reply(collectionResult.message);
 
-    await ctx.reply("🃏 Твои карты:\n" + cards.map((c) => `${c.name} ${SUIT_EMOJI[c.suit]}`).join(", "));
-    if (collectionResult) {
-      await ctx.reply(collectionResult.message);
-    }
     const mergedImage = await generateMergedImage(cardsIds, userId);
+    await ctx.replyWithPhoto({ source: mergedImage });
+    await fs.unlink(mergedImage).catch(() => {});
 
-    try {
-      await ctx.replyWithPhoto({ source: mergedImage });
-    } finally {
-      fs.unlinkSync(mergedImage);
-    }
-
-    // Создаем начальное сообщение для стриминга
+    // Создаем сообщение для стриминга
     const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
+    userStreams.set(userId, true); // отмечаем активный стрим
+
+    const userStyle = await db.getUserResponseStyle(userId);
+    const prompt = buildPrompt(question, cards, userStyle);
     let currentText = "🔮\n\n";
     let lastUpdate = Date.now();
-    const userStyle = db.getUserResponseStyle(userId);
-    const prompt = buildPrompt(question, cards, userStyle);
 
-    // Функция для обработки стриминга
-    const handleStream = async (chunk) => {
-      currentText += chunk;
-
-      // Обновляем сообщение не чаще чем раз в 500мс
-      if (Date.now() - lastUpdate > 2000) {
-        try {
-          await ctx.telegram.editMessageText(
-            waitingMsg.chat.id,
-            waitingMsg.message_id,
-            undefined,
-            currentText + " 🔮" // Курсор для индикации печати
-          );
-          lastUpdate = Date.now();
-        } catch (error) {
-          // Игнорируем ошибки редактирования (например, если сообщение слишком длинное)
-          console.log("Ошибка редактирования:", error.message);
-        }
-      }
-    };
-
-    // Функция для завершения стриминга
-    const handleComplete = async (finalText) => {
+    // Асинхронная функция для стриминга
+    (async () => {
       try {
-        await ctx.telegram.editMessageText(
-          waitingMsg.chat.id,
-          waitingMsg.message_id,
-          undefined,
-          finalText
+        await askOpenAIStreaming(
+          prompt,
+          async (chunk) => {
+            currentText += chunk;
+            if (Date.now() - lastUpdate > 2000) {
+              lastUpdate = Date.now();
+              await ctx.telegram.editMessageText(
+                waitingMsg.chat.id,
+                waitingMsg.message_id,
+                undefined,
+                currentText + " 🔮"
+              ).catch(()=>{});
+            }
+          },
+          async (finalText) => {
+            await ctx.telegram.editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, finalText)
+              .catch(()=>{});
+            userStreams.delete(userId); // снимаем блокировку после завершения
+          }
         );
-      } catch (error) {
-        console.log("Финальное обновление не удалось:", error.message);
+      } catch (err) {
+        console.error(err);
+        userStreams.delete(userId);
+        await ctx.telegram.editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined,
+          "Упс, что-то пошло не так при обращении к ИИ. Попробуй ещё раз 🙏"
+        ).catch(()=>{});
       }
-    };
-
-    // Получаем ответ со стримингом
-    const interpretation = await askOpenAIStreaming(prompt, handleStream, handleComplete);
-
-    if (user.questionsLeft <= 0) {
-      sendNoQuestionsMessage(ctx);
-      return;
-    }
+    })();
 
   } catch (err) {
     console.error(err);
-    await ctx.reply("Упс, что-то пошло не так при обращении к ИИ. Попробуй ещё раз чуть позже 🙏");
+    await ctx.reply("Упс, что-то пошло не так. Попробуй ещё раз 🙏");
   }
 });
+
+
 
 bot.launch().then(() => {
   console.log("✅ Tarot Bot запущен");
