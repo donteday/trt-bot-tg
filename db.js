@@ -1,235 +1,219 @@
-const sqlite3 = require("sqlite3").verbose();
-const db = new sqlite3.Database("tarot.db");
+// db.js (better-sqlite3 версия, CommonJS)
+const Database = require("better-sqlite3");
+const db = new Database("tarot.db");
 
+// Режим WAL — ускоряет параллельные записи
+try {
+  db.pragma("journal_mode = WAL");
+  db.pragma("foreign_keys = ON");
+} catch (e) {
+  console.warn("Не удалось установить pragma:", e);
+}
+
+/**
+ * addColumnIfNotExists(table, column, type, defaultValue = null)
+ * Возвращает Promise<boolean> — true если добавлена колонка, false если уже есть.
+ */
 function addColumnIfNotExists(table, column, type, defaultValue = null) {
   return new Promise((resolve, reject) => {
-    db.all(`PRAGMA table_info(${table})`, (err, rows) => {
-      if (err) return reject(err);
-
+    try {
+      const rows = db.prepare(`PRAGMA table_info(${table})`).all();
       const exists = rows.some(r => r.name === column);
-      if (!exists) {
-        let sql = `ALTER TABLE ${table} ADD COLUMN ${column} ${type}`;
-        if (defaultValue !== null) {
+      if (exists) return resolve(false);
+
+      let sql = `ALTER TABLE ${table} ADD COLUMN ${column} ${type}`;
+      if (defaultValue !== null) {
+        // корректно экранируем строковые default'ы
+        if (typeof defaultValue === "string") {
+          const safe = defaultValue.replace(/'/g, "''");
+          sql += ` DEFAULT '${safe}'`;
+        } else {
           sql += ` DEFAULT ${defaultValue}`;
         }
-        db.run(sql, (err2) => {
-          if (err2) return reject(err2);
-          console.log(`✅ Added column ${column} to ${table}`);
-          resolve(true);
-        });
-      } else {
-        resolve(false); // колонка уже есть
       }
-    });
+      db.prepare(sql).run();
+      console.log(`✅ Added column ${column} to ${table}`);
+      resolve(true);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
-// Создание таблицы пользователей
-db.serialize(async () => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      userId INTEGER PRIMARY KEY,
-      questionsLeft INTEGER DEFAULT 3,
-      fateUsed INTEGER DEFAULT 0,
-      email TEXT DEFAULT NULL,
-      yookassaPaymentId TEXT DEFAULT NULL,
-      paymentStatus TEXT DEFAULT 'pending',
-      paymentAmount REAL DEFAULT 0,
-      paymentDate DATETIME DEFAULT NULL
-    )
-  `);
+// --- Создание таблиц (если нет) ---
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    userId INTEGER PRIMARY KEY,
+    questionsLeft INTEGER DEFAULT 3,
+    fateUsed INTEGER DEFAULT 0,
+    email TEXT DEFAULT NULL,
+    yookassaPaymentId TEXT DEFAULT NULL,
+    paymentStatus TEXT DEFAULT 'pending',
+    paymentAmount REAL DEFAULT 0,
+    paymentDate DATETIME DEFAULT NULL
+  );
+`);
 
-  // Таблица для хранения истории платежей
-  db.run(`
-    CREATE TABLE IF NOT EXISTS payments (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      userId INTEGER,
-      paymentId TEXT,
-      amount REAL,
-      status TEXT,
-      description TEXT,
-      customer_email TEXT DEFAULT NULL,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (userId) REFERENCES users (userId)
-    )
-  `);
+db.exec(`
+  CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER,
+    paymentId TEXT,
+    amount REAL,
+    status TEXT,
+    description TEXT,
+    customer_email TEXT DEFAULT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users (userId)
+  );
+`);
 
-  // Автоматическая миграция (добавляем новые колонки при необходимости)
-  await addColumnIfNotExists("users", "referral_code", "TEXT");
-  await addColumnIfNotExists("users", "referrals_count", "INTEGER", 0);
-  await addColumnIfNotExists("users", "response_style", "INTEGER", 1);
-  await addColumnIfNotExists("users", "invited_by", "TEXT"); // кто пригласил
-  await addColumnIfNotExists("users", "collected_cards", "TEXT", '[]'); // коллекция
-  await addColumnIfNotExists("users", "completed_suits", "TEXT", '[]'); // коллекция
+// Авто-миграции — запускаем и логируем (используем Promise API)
+(async () => {
+  try {
+    await addColumnIfNotExists("users", "referral_code", "TEXT");
+    await addColumnIfNotExists("users", "referrals_count", "INTEGER", 0);
+    await addColumnIfNotExists("users", "response_style", "INTEGER", 1);
+    await addColumnIfNotExists("users", "invited_by", "TEXT");
+    await addColumnIfNotExists("users", "collected_cards", "TEXT", "[]");
+    await addColumnIfNotExists("users", "completed_suits", "TEXT", "[]");
+  } catch (e) {
+    console.error("Migration error:", e);
+  }
+})();
 
+// ------------------ Функции (с теми же именами и сигнатурами) ------------------
 
-
-});
-
-// Получить данные пользователя
+// Получить данные пользователя (Promise)
 function getUser(userId) {
   return new Promise((resolve, reject) => {
-    db.get("SELECT * FROM users WHERE userId = ?", [userId], (err, row) => {
-      if (err) return reject(err);
-
+    try {
+      let row = db.prepare("SELECT * FROM users WHERE userId = ?").get(userId);
       if (!row) {
-        // Пользователя нет - создаем нового с обработкой конфликта
-        db.run(
-          "INSERT OR IGNORE INTO users (userId, questionsLeft, fateUsed) VALUES (?, 3, 0)",
-          [userId],
-          function (err2) {
-            if (err2) {
-              // Если произошла ошибка (например, пользователь уже добавился в другом запросе)
-              // Пробуем снова найти пользователя
-              db.get("SELECT * FROM users WHERE userId = ?", [userId], (err3, row2) => {
-                if (err3) return reject(err3);
-                resolve(row2 || { userId, questionsLeft: 3, fateUsed: 0 });
-              });
-            } else {
-              // Успешно создали нового пользователя
-              resolve({ userId, questionsLeft: 3, fateUsed: 0 });
-            }
-          }
-        );
-      } else {
-        // Пользователь уже существует
-        resolve(row);
+        // Вставляем и читаем снова
+        db.prepare("INSERT OR IGNORE INTO users (userId, questionsLeft, fateUsed) VALUES (?, 3, 0)").run(userId);
+        row = db.prepare("SELECT * FROM users WHERE userId = ?").get(userId);
+        if (!row) {
+          // Не удалось прочитать — возвращаем дефолт объект (как раньше)
+          return resolve({ userId, questionsLeft: 3, fateUsed: 0 });
+        }
       }
-    });
+      resolve(row);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
-// Обновить email пользователя
+// Обновить email пользователя (Promise<boolean>)
 function updateUserEmail(userId, email) {
   return new Promise((resolve, reject) => {
-    db.run(
-      "UPDATE users SET email = ? WHERE userId = ?",
-      [email, userId],
-      function (err) {
-        if (err) return reject(err);
-        resolve(this.changes > 0);
-      }
-    );
+    try {
+      const info = db.prepare("UPDATE users SET email = ? WHERE userId = ?").run(email, userId);
+      resolve(info.changes > 0);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
-// Сохранить информацию о платеже
+// Сохранить информацию о платеже (Promise<lastInsertId>)
 function savePayment(userId, paymentData) {
   return new Promise((resolve, reject) => {
-    const { id, amount, status, description, email } = paymentData;
+    try {
+      const { id, amount, status, description, email } = paymentData;
 
-    // Обновляем пользователя
-    db.run(
-      `UPDATE users SET 
-       yookassaPaymentId = ?, 
-       paymentStatus = ?,
-       paymentAmount = ?,
-       paymentDate = datetime('now')
-       WHERE userId = ?`,
-      [id, status, amount.value, userId],
-      function (err) {
-        if (err) return reject(err);
+      db.prepare(`
+        UPDATE users SET 
+          yookassaPaymentId = ?, 
+          paymentStatus = ?,
+          paymentAmount = ?,
+          paymentDate = datetime('now')
+        WHERE userId = ?
+      `).run(id, status, amount.value, userId);
 
-        // Сохраняем в историю платежей с email
-        db.run(
-          `INSERT INTO payments (userId, paymentId, amount, status, description, customer_email) 
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [userId, id, amount.value, status, description, email],
-          function (err2) {
-            if (err2) return reject(err2);
-            resolve(this.lastID);
-          }
-        );
-      }
-    );
+      const info = db.prepare(`
+        INSERT INTO payments (userId, paymentId, amount, status, description, customer_email)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).run(userId, id, amount.value, status, description, email);
+
+      resolve(info.lastInsertRowid);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
-// Обновить статус платежа
+// Обновить статус платежа (Promise<boolean>)
 function updatePaymentStatus(paymentId, status) {
   return new Promise((resolve, reject) => {
-    db.run(
-      "UPDATE users SET paymentStatus = ? WHERE yookassaPaymentId = ?",
-      [status, paymentId],
-      function (err) {
-        if (err) return reject(err);
-
-        // Также обновляем в истории платежей
-        db.run(
-          "UPDATE payments SET status = ? WHERE paymentId = ?",
-          [status, paymentId],
-          function (err2) {
-            if (err2) return reject(err2);
-            resolve(this.changes > 0);
-          }
-        );
-      }
-    );
+    try {
+      const u1 = db.prepare("UPDATE users SET paymentStatus = ? WHERE yookassaPaymentId = ?").run(status, paymentId);
+      const u2 = db.prepare("UPDATE payments SET status = ? WHERE paymentId = ?").run(status, paymentId);
+      resolve((u1.changes + u2.changes) > 0);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
-// Добавить вопросы после успешной оплаты
+// Добавить вопросы после успешной оплаты (Promise<boolean>)
 function addQuestionsAfterPayment(userId, amount) {
   return new Promise((resolve, reject) => {
-    db.run(
-      "UPDATE users SET questionsLeft = questionsLeft + ? WHERE userId = ?",
-      [amount, userId],
-      function (err) {
-        if (err) return reject(err);
-        resolve(this.changes > 0);
-      }
-    );
+    try {
+      const info = db.prepare("UPDATE users SET questionsLeft = questionsLeft + ? WHERE userId = ?").run(amount, userId);
+      resolve(info.changes > 0);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
-// Списать 1 вопрос
+// Списать 1 вопрос (Promise<boolean>)
 function useQuestion(userId) {
   return new Promise((resolve, reject) => {
-    db.run(
-      "UPDATE users SET questionsLeft = questionsLeft - 1 WHERE userId = ? AND questionsLeft > 0",
-      [userId],
-      function (err) {
-        if (err) return reject(err);
-        resolve(this.changes > 0);
-      }
-    );
+    try {
+      const info = db.prepare("UPDATE users SET questionsLeft = questionsLeft - 1 WHERE userId = ? AND questionsLeft > 0").run(userId);
+      resolve(info.changes > 0);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
-// Использовать матрицу судьбы
+// Использовать матрицу судьбы (Promise<boolean>)
 function useFate(userId) {
   return new Promise((resolve, reject) => {
-    db.run(
-      "UPDATE users SET fateUsed = 1 WHERE userId = ? AND fateUsed = 0",
-      [userId],
-      function (err) {
-        if (err) return reject(err);
-        resolve(this.changes > 0);
-      }
-    );
+    try {
+      const info = db.prepare("UPDATE users SET fateUsed = 1 WHERE userId = ? AND fateUsed = 0").run(userId);
+      resolve(info.changes > 0);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
-// Получить историю платежей пользователя
+// Получить историю платежей пользователя (Promise<array>)
 function getPaymentHistory(userId) {
   return new Promise((resolve, reject) => {
-    db.all(
-      "SELECT * FROM payments WHERE userId = ? ORDER BY created_at DESC",
-      [userId],
-      (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows);
-      }
-    );
+    try {
+      const rows = db.prepare("SELECT * FROM payments WHERE userId = ? ORDER BY created_at DESC").all(userId);
+      resolve(rows);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
+// Получить общее количество пользователей (Promise<number>)
 function getTotalUsers() {
   return new Promise((resolve, reject) => {
-    db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
-      if (err) return reject(err);
+    try {
+      const row = db.prepare("SELECT COUNT(*) as count FROM users").get();
       resolve(row.count);
-    });
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
@@ -237,134 +221,130 @@ function generateReferralCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-// Получить или создать реферальный код
-async function getOrCreateReferralCode(userId) {
+// Получить или создать реферальный код (Promise<string>)
+function getOrCreateReferralCode(userId) {
   return new Promise((resolve, reject) => {
-    db.get("SELECT referral_code FROM users WHERE userId = ?", [userId], (err, row) => {
-      if (err) return reject(err);
+    try {
+      const row = db.prepare("SELECT referral_code FROM users WHERE userId = ?").get(userId);
+      if (row && row.referral_code) return resolve(row.referral_code);
 
-      if (row && row.referral_code) {
-        resolve(row.referral_code);
-      } else {
-        const newCode = generateReferralCode();
-        db.run(
-          "UPDATE users SET referral_code = ? WHERE userId = ?",
-          [newCode, userId],
-          function (err) {
-            if (err) return reject(err);
-            resolve(newCode);
-          }
-        );
-      }
-    });
+      const newCode = generateReferralCode();
+      db.prepare("UPDATE users SET referral_code = ? WHERE userId = ?").run(newCode, userId);
+      resolve(newCode);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
+// Поощрение рефереру (Promise<referrerId|false>)
 function rewardReferrer(referralCode) {
   return new Promise((resolve, reject) => {
-    if (!referralCode) return resolve(false);
-
-    db.get("SELECT userId FROM users WHERE referral_code = ?", [referralCode], (err, row) => {
-      if (err) return reject(err);
+    try {
+      if (!referralCode) return resolve(false);
+      const row = db.prepare("SELECT userId FROM users WHERE referral_code = ?").get(referralCode);
       if (!row) return resolve(false);
-
-      const referrerId = row.userId;
-      db.run(
-        "UPDATE users SET questionsLeft = questionsLeft + 3, referrals_count = referrals_count + 1 WHERE userId = ?",
-        [referrerId],
-        function (err2) {
-          if (err2) return reject(err2);
-          resolve(referrerId);
-        }
-      );
-    });
+      db.prepare("UPDATE users SET questionsLeft = questionsLeft + 3, referrals_count = referrals_count + 1 WHERE userId = ?").run(row.userId);
+      resolve(row.userId);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
-// Сохраняем кто пригласил нового пользователя
+// Сохраняем кто пригласил нового пользователя (Promise<boolean>)
 function setInvitedBy(userId, referralCode) {
   return new Promise((resolve, reject) => {
-    db.run(
-      "UPDATE users SET invited_by = ? WHERE userId = ?",
-      [referralCode, userId],
-      function (err) {
-        if (err) return reject(err);
-        resolve(this.changes > 0);
-      }
-    );
+    try {
+      const info = db.prepare("UPDATE users SET invited_by = ? WHERE userId = ?").run(referralCode, userId);
+      resolve(info.changes > 0);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
+// Получить пользователя по реф-коду (Promise<row|null>)
 function getUserByReferralCode(referralCode) {
   return new Promise((resolve, reject) => {
-    db.get(
-      "SELECT * FROM users WHERE referral_code = ?",
-      [referralCode],
-      (err, row) => {
-        if (err) return reject(err);
-        resolve(row || null);
-      }
-    );
+    try {
+      const row = db.prepare("SELECT * FROM users WHERE referral_code = ?").get(referralCode);
+      resolve(row || null);
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
+// --- Коллекции карт и бонусы ---
+// getUserData(callback-style) — оставил callback для совместимости
 const getUserData = (userId, callback) => {
-  db.get(`SELECT * FROM users WHERE userId = ?`, [userId], callback);
+  try {
+    const row = db.prepare("SELECT * FROM users WHERE userId = ?").get(userId);
+    callback(null, row);
+  } catch (err) {
+    callback(err);
+  }
 };
 
+// updateUserWithBonus (callback-style) — как у тебя было
 const updateUserWithBonus = (userId, bonus, collectedCards, completedSuits, callback) => {
-  db.run(
-    `UPDATE users SET questionsLeft = questionsLeft + ?, collected_cards = ?, completed_suits = ? WHERE userId = ?`,
-    [bonus, collectedCards, completedSuits, userId],
-    callback
-  );
+  try {
+    db.prepare(`
+      UPDATE users 
+      SET questionsLeft = questionsLeft + ?, collected_cards = ?, completed_suits = ? 
+      WHERE userId = ?
+    `).run(bonus, collectedCards, completedSuits, userId);
+    callback(null);
+  } catch (err) {
+    callback(err);
+  }
 };
 
+// updateUserCards (callback-style)
 const updateUserCards = (userId, collectedCards, callback) => {
-  db.run(
-    `UPDATE users SET collected_cards = ? WHERE userId = ?`,
-    [collectedCards, userId],
-    callback
-  );
+  try {
+    db.prepare("UPDATE users SET collected_cards = ? WHERE userId = ?").run(collectedCards, userId);
+    callback(null);
+  } catch (err) {
+    callback(err);
+  }
 };
 
-// Функция изменения стиля ответа
+// --- Стиль ответов ---
+// Сохраняем так, чтобы не удалять остальные поля пользователя
 async function setUserResponseStyle(userId, styleId) {
-  try {
-    await new Promise((resolve, reject) => {
-      db.run(
-        "INSERT OR REPLACE INTO users (userId, response_style) VALUES (?, ?)",
-        [userId, styleId],
-        function(err) {
-          if (err) reject(err);
-          else resolve(this);
-        }
-      );
-    });
-    return true;
-  } catch (error) {
-    console.error('Error setting response style:', error);
-    return false;
-  }
+  return new Promise((resolve) => {
+    try {
+      const info = db.prepare("UPDATE users SET response_style = ? WHERE userId = ?").run(styleId, userId);
+      if (info.changes === 0) {
+        // Запись не обновлена — вставим (только userId и response_style)
+        db.prepare("INSERT OR IGNORE INTO users (userId, response_style) VALUES (?, ?)").run(userId, styleId);
+      }
+      resolve(true);
+    } catch (err) {
+      console.error("Error setting response style:", err);
+      resolve(false);
+    }
+  });
 }
 
-// Функция получения стиля пользователя
 async function getUserResponseStyle(userId) {
-  try {
-    const row = await new Promise((resolve, reject) => {
-      db.get("SELECT response_style FROM users WHERE userId = ?", [userId], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
-    return row ? row.response_style : 1; // По умолчанию стиль 1
-  } catch (error) {
-    console.error('Error getting response style:', error);
-    return 1;
-  }
+  return new Promise((resolve) => {
+    try {
+      const row = db.prepare("SELECT response_style FROM users WHERE userId = ?").get(userId);
+      resolve(row ? row.response_style : 1);
+    } catch (err) {
+      console.error("Error getting response style:", err);
+      resolve(1);
+    }
+  });
 }
 
+// ------------------ Экспортируем все функции ------------------
 module.exports = {
+  addColumnIfNotExists,
+
   getUser,
   useQuestion,
   useFate,
@@ -379,9 +359,13 @@ module.exports = {
   rewardReferrer,
   setInvitedBy,
   getUserByReferralCode,
+
+  // Коллекции (callback-style)
   getUserData,
   updateUserWithBonus,
   updateUserCards,
+
+  // Стиль ответов
   setUserResponseStyle,
   getUserResponseStyle
 };

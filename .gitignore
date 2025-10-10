@@ -12,3 +12,6 @@ tarot.db
 *.crt
 *.db
 tarot.db
+tarot.db-shm
+tarot.db-wal
+db3.js
