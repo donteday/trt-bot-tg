@@ -564,7 +564,6 @@ async function askOpenAIStreaming(prompt, onChunk, onComplete) {
   }
 }
 const userStreams = new Map(); 
-const fs = require('fs').promises;
 
 bot.on("text", async (ctx) => {
   const userId = ctx.from.id;
