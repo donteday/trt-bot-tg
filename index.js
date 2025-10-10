@@ -69,7 +69,7 @@ app.post("/yookassa-webhook", async (req, res) => {
     const tokensAmount = metadata?.tokensAmount;
 
     if (userId && amount) {
-      db.addQuestionsAfterPayment(userId, tokensAmount);
+      await db.addQuestionsAfterPayment(userId, tokensAmount);
       await bot.telegram.sendMessage(
         userId,
         `✅ Оплата прошла!\nВам начислено ${tokensAmount} вопросов 🌟`
@@ -112,8 +112,8 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
 
   try {
     // Получаем данные пользователя
-    const user = db.getUser(userId);
-    console.log(user);
+    const user = await db.getUser(userId);
+    console.log(user.email);
     
     // Проверяем, есть ли email у пользователя
     if (!user.email) {
@@ -198,7 +198,7 @@ bot.action("get_free_questions", async (ctx) => {
 
     // Теперь делаем долгие операции
     const userId = ctx.from.id;
-    const code = db.getOrCreateReferralCode(userId);
+    const code = await db.getOrCreateReferralCode(userId);
 
     const refLink = `https://t.me/${ctx.botInfo.username}?start=ref_${code}`;
     await ctx.reply(
@@ -436,10 +436,10 @@ bot.start(async (ctx) => {
   if (text.includes("ref_") && !user.invited_by) { // только если еще не приглашён
     const referralCode = text.split("ref_")[1];
 
-    const referrer = db.getUserByReferralCode(referralCode).catch(() => null);
+    const referrer = await db.getUserByReferralCode(referralCode).catch(() => null);
     if (referrer && referrer.userId !== userId) {
-      db.rewardReferrer(referralCode);
-      db.setInvitedBy(userId, referralCode);
+      await db.rewardReferrer(referralCode);
+      await db.setInvitedBy(userId, referralCode);
 
       ctx.telegram.sendMessage(
         referrer.userId,
@@ -587,7 +587,7 @@ bot.on("text", async (ctx) => {
     }
 
     try {
-      db.updateUserEmail(userId, email); // предполагаем, что updateUserEmail теперь async
+      await db.updateUserEmail(userId, email); // предполагаем, что updateUserEmail теперь async
       userStates.delete(userId);
       await ctx.reply(`✅ Email сохранен!\n\n`);
       sendNoQuestionsMessage(ctx);
@@ -608,7 +608,7 @@ bot.on("text", async (ctx) => {
     return sendNoQuestionsMessage(ctx);
   }
 
-  const ok = useQuestion(userId);
+  const ok = await useQuestion(userId);
   if (!ok) {
     return ctx.reply("🚫 У тебя нет доступных вопросов.");
   }
