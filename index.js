@@ -69,7 +69,7 @@ app.post("/yookassa-webhook", async (req, res) => {
     const tokensAmount = metadata?.tokensAmount;
 
     if (userId && amount) {
-      await db.addQuestionsAfterPayment(userId, tokensAmount);
+      db.addQuestionsAfterPayment(userId, tokensAmount);
       await bot.telegram.sendMessage(
         userId,
         `✅ Оплата прошла!\nВам начислено ${tokensAmount} вопросов 🌟`
@@ -112,7 +112,7 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
 
   try {
     // Получаем данные пользователя
-    const user = await db.getUser(userId);
+    const user = db.getUser(userId);
 
     // Проверяем, есть ли email у пользователя
     if (!user.email) {
@@ -164,7 +164,7 @@ bot.action(/style_(\d+)/, async (ctx) => {
   const selectedStyle = styleConfig[styleId];
 
   try {
-    await db.setUserResponseStyle(userId, styleId);
+    db.setUserResponseStyle(userId, styleId);
     await ctx.editMessageText(
       `✅ Выбран стиль: ${selectedStyle}\n\nТеперь все ответы будут в этом формате ✨`
     );
@@ -197,7 +197,7 @@ bot.action("get_free_questions", async (ctx) => {
 
     // Теперь делаем долгие операции
     const userId = ctx.from.id;
-    const code = await db.getOrCreateReferralCode(userId);
+    const code = db.getOrCreateReferralCode(userId);
 
     const refLink = `https://t.me/${ctx.botInfo.username}?start=ref_${code}`;
     await ctx.reply(
@@ -429,16 +429,16 @@ bot.start(async (ctx) => {
   const text = ctx.message.text || "";
 
   // 1) Сначала создаем пользователя, если нет
-  const user = await db.getUser(userId);
+  const user = db.getUser(userId);
 
   // 2) Проверяем рефералку
   if (text.includes("ref_") && !user.invited_by) { // только если еще не приглашён
     const referralCode = text.split("ref_")[1];
 
-    const referrer = await db.getUserByReferralCode(referralCode).catch(() => null);
+    const referrer = db.getUserByReferralCode(referralCode).catch(() => null);
     if (referrer && referrer.userId !== userId) {
-      await db.rewardReferrer(referralCode);
-      await db.setInvitedBy(userId, referralCode);
+      db.rewardReferrer(referralCode);
+      db.setInvitedBy(userId, referralCode);
 
       ctx.telegram.sendMessage(
         referrer.userId,
@@ -581,7 +581,7 @@ bot.on("text", async (ctx) => {
 
     try {
       // Сохраняем email
-      await db.updateUserEmail(userId, email);
+      db.updateUserEmail(userId, email);
       userStates.delete(userId);
       await ctx.reply(`✅ Email сохранен!\n\n`);
       sendNoQuestionsMessage(ctx);
@@ -639,7 +639,7 @@ bot.on("text", async (ctx) => {
     const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
     let currentText = "🔮\n\n";
     let lastUpdate = Date.now();
-    const userStyle = await db.getUserResponseStyle(userId);
+    const userStyle = db.getUserResponseStyle(userId);
     const prompt = buildPrompt(question, cards, userStyle);
 
     // Функция для обработки стриминга
