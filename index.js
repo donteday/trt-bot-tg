@@ -18,6 +18,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const sendChangeStyleMessage = require("./commands/style.js");
 const { styleConfig } = require("./configs/configs.js");
+const { log } = require("console");
 
 bot.catch((err, ctx) => {
   console.error(`❌ Ошибка в апдейте для ${ctx.updateType}`, err);
@@ -81,14 +82,14 @@ app.post("/yookassa-webhook", async (req, res) => {
   res.sendStatus(200);
 });
 
-const options = {
-  key: fs.readFileSync(path.join(__dirname, "/cert/certificate.key")),
-  cert: fs.readFileSync(path.join(__dirname, "/cert/certificate.crt"))
-};
+// const options = {
+//   key: fs.readFileSync(path.join(__dirname, "/cert/certificate.key")),
+//   cert: fs.readFileSync(path.join(__dirname, "/cert/certificate.crt"))
+// };
 
-https.createServer(options, app).listen(443, () => {
-  console.log("🚀 HTTPS сервер слушает порт 443");
-});
+// https.createServer(options, app).listen(443, () => {
+//   console.log("🚀 HTTPS сервер слушает порт 443");
+// });
 
 const SUIT_EMOJI = {
   Wands: "🔥",
@@ -428,9 +429,9 @@ const getSuitName = (suit) => {
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
   const text = ctx.message.text || "";
-
+  
   // 1) Сначала создаем пользователя, если нет
-  const user = db.getUser(userId);
+  const user = await db.getUser(userId);
 
   // 2) Проверяем рефералку
   if (text.includes("ref_") && !user.invited_by) { // только если еще не приглашён
@@ -570,6 +571,7 @@ const userStreams = new Map();
 bot.on("text", async (ctx) => {
   const userId = ctx.from.id;
   const question = (ctx.message?.text || "").trim();
+  console.log(userId, "User message");
 
   // Предотвращаем параллельные стримы для одного пользователя
   if (userStreams.has(userId)) {
@@ -602,7 +604,7 @@ bot.on("text", async (ctx) => {
     return ctx.reply("❌ Пожалуйста, задай корректный вопрос (не менее 2 слов).");
   }
 
-  const user = getUser(userId);
+  const user = await getUser(userId);
 
   if (user.questionsLeft <= 0) {
     return sendNoQuestionsMessage(ctx);
@@ -630,7 +632,9 @@ bot.on("text", async (ctx) => {
     const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
     userStreams.set(userId, true); // отмечаем активный стрим
 
-    const userStyle = db.getUserResponseStyle(userId);
+    const userStyle = await db.getUserResponseStyle(userId);
+    console.log(userStyle);
+    
     const prompt = buildPrompt(question, cards, userStyle);
     let currentText = "🔮\n\n";
     let lastUpdate = Date.now();
