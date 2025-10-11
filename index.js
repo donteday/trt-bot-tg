@@ -183,6 +183,7 @@ async function sendNoQuestionsMessage(ctx) {
       [Markup.button.callback("💎 100 запросов — 399₽ (-20%)", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 239₽ (-20%)", "buy_questions_3")],
       [Markup.button.callback("🔮 10 запросов — 79₽ (-20%)", "buy_questions_2")],
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
       [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
   );
@@ -219,6 +220,7 @@ bot.command("price", async (ctx) => {
       [Markup.button.callback("💎 100 запросов — 399₽ (-20%)", "buy_questions_4")],
       [Markup.button.callback("🌌 40 запросов — 239₽ (-20%)", "buy_questions_3")],
       [Markup.button.callback("🔮 10 запросов — 79₽ (-20%)", "buy_questions_2")],
+      [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
       [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
   );
@@ -571,7 +573,7 @@ const userStreams = new Map();
 bot.on("text", async (ctx) => {
   const userId = ctx.from.id;
   const question = (ctx.message?.text || "").trim();
-  console.log(userId, "User message");
+  console.log("User send message| Id: ", userId, "| Name: ", ctx.from.username);
 
   // Предотвращаем параллельные стримы для одного пользователя
   if (userStreams.has(userId)) {
@@ -633,7 +635,6 @@ bot.on("text", async (ctx) => {
     userStreams.set(userId, true); // отмечаем активный стрим
 
     const userStyle = await db.getUserResponseStyle(userId);
-    console.log(userStyle);
     
     const prompt = buildPrompt(question, cards, userStyle);
     let currentText = "🔮\n\n";
