@@ -105,9 +105,9 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
   const packageId = parseInt(ctx.match[1]);
   const packages = {
     1: { amount: 3, price: 49 },
-    2: { amount: 10, price: 79 },
-    3: { amount: 40, price: 239 },
-    4: { amount: 100, price: 399 }
+    2: { amount: 10, price: 99 },
+    3: { amount: 40, price: 299 },
+    4: { amount: 100, price: 499 }
   };
   const selectedPackage = packages[packageId];
 
@@ -115,7 +115,7 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
     // Получаем данные пользователя
     const user = await db.getUser(userId);
     console.log(user.email);
-    
+
     // Проверяем, есть ли email у пользователя
     if (!user.email) {
       await ctx.reply(
@@ -180,9 +180,9 @@ async function sendNoQuestionsMessage(ctx) {
   return ctx.reply(
     "🌟 Закончились вопросы, выбери пакет, чтобы продолжить 🌟",
     Markup.inlineKeyboard([
-      [Markup.button.callback("💎 100 запросов — 399₽ (-20%)", "buy_questions_4")],
-      [Markup.button.callback("🌌 40 запросов — 239₽ (-20%)", "buy_questions_3")],
-      [Markup.button.callback("🔮 10 запросов — 79₽ (-20%)", "buy_questions_2")],
+      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
+      [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
+      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
       [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
       [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
@@ -217,9 +217,9 @@ bot.command("price", async (ctx) => {
   await ctx.reply(
     "Выбери пакет запросов🌟",
     Markup.inlineKeyboard([
-      [Markup.button.callback("💎 100 запросов — 399₽ (-20%)", "buy_questions_4")],
-      [Markup.button.callback("🌌 40 запросов — 239₽ (-20%)", "buy_questions_3")],
-      [Markup.button.callback("🔮 10 запросов — 79₽ (-20%)", "buy_questions_2")],
+      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
+      [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
+      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
       [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
       [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
@@ -270,49 +270,53 @@ function buildPrompt(question, cards, styleId = 1) {
   // Конфигурация стилей
   const stylePrompts = {
     1: `🔮 **СТАНДАРТНЫЙ СТИЛЬ**
-Создай классическую интерпретацию с духовными инсайтами. 
-Используй мудрый, эмпатичный тон таролога-проводника.
-Важно: глубина, эмпатия, духовные инсайты`,
+Ты — опытный таролог с мягким голосом и глубокой эмпатией.
+Отвечай как человек, не как книга. 
+Говори простыми словами, как будто рядом сидит человек, которому больно или тревожно.
+Важно: духовная глубина + человечность + лёгкие метафоры.`,
 
-    2: `💫 **МОТИВАЦИОННЫЙ СТИЛЬ**  
-Создай вдохновляющую интерпретацию, которая зарядит на действия.
-Используй энергичный, поддерживающий тон коуча.
-Важно: мотивация, конкретные шаги, вера в себя`,
+    2: `💫 **МОТИВАЦИОННЫЙ СТИЛЬ**
+Ты — духовный коуч с энергией поддержки.
+Отвечай с верой, драйвом и ясными шагами, будто подбадриваешь подругу перед новым этапом.
+Важно: вдохновение + конкретика + уверенность, что всё получится.`,
 
     3: `😈 **ЖЕСТКИЙ СТИЛЬ**
-Создай прямолинейную интерпритацию с большим количеством юмора и матами.
-Используй честный, юморной тон с подколами и мемами.
-Важно: правда без сахара, конкретика, вызов к действию`,
+Ты — прямолинейный друг, который говорит правду в лоб, но с харизмой и юмором.
+Можешь использовать лёгкий мат и сарказм, как будто рассказываешь подруге всю правду про её бывшего.
+Важно: честность + эмоции + острота, но без злобы.`,
 
     4: `👯 **СТИЛЬ ЛУЧШЕЙ ПОДРУГИ**
-Создай теплую, доверительную интерпретацию, как будто вы на кухне за бутылкой вина.
-Используй неформальный, поддерживающий тон с кучей юмора.
-Важно: забота, юмор, практические советы "как для подруги"`
+Ты — та самая подруга, с которой можно всё обсудить за бокалом вина.
+Пиши тепло, с лёгким юмором и сочувствием, вставляй разговорные фразы (“блин”, “ну вот”, “серьёзно?”).
+Важно: лёгкость + поддержка + личный вайб общения.`
   };
 
   const styleInstruction = stylePrompts[styleId] || stylePrompts[1];
 
   return `
-Ты — таролог, работающий в выбранном стиле. Адаптируйся под тон и подход.
+Ты — таролог, работающий в выбранном стиле. Отвечай эмоционально, человечно и естественно. 
+Говори с пользователем напрямую, будто он сидит рядом. Избегай канцеляризмов, сухости и фраз вроде “карта указывает”.
 
 **СТИЛЬ ОТВЕТА:**
 ${styleInstruction}
 
-**КОНТЕКСТ:** Пользователь уже обратился к тебе ранее. Не приветствуй его снова, сразу переходи к сути.
+**КОНТЕКСТ:** пользователь уже писал ранее — не начинай с приветствия.
 
 Вопрос: ${question}
-Карты: ${list}
+Карты: 
+${list}
 
-Создай интерпретацию в выбранном стиле, которая:
-🌟 Начинается сразу с общего послания расклада
-📖 Объясняет каждую карту в контексте вопроса  
-🔄 Показывает диалог между картами
-💡 Даёт практические подсказки для действий
-🌈 Завершается ободряющим выводом
+СОЗДАЙ ответ, который:
+✨ начинается с короткой эмоциональной фразы или образа 
+📖 раскрывает каждую карту живо и по-человечески — через чувства, не лекцию
+🔄 соединяет карты в историю 
+💡 даёт 1–2 практических совета, как действовать или что осознать
+🌙 завершает фразой, которая оставляет ощущение смысла или намёк на продолжение (“хочешь, посмотрим, что будет дальше?”)
 
-**ВАЖНО:** Строго соблюдай выбранный стиль общения, но отвечай не шаблонно. Отвечай подробно не более 4000 символов. Используй эмодзи соответственно стилю, но не используй ** в оформлении.
+Пиши максимум 3000 символов. Используй эмодзи умеренно, только по смыслу. Не используй ** в оформлении.
 `.trim();
 }
+
 
 async function generateMergedImage(cardsIds, userId) {
   const images = await Promise.all(
@@ -431,7 +435,7 @@ const getSuitName = (suit) => {
 bot.start(async (ctx) => {
   const userId = ctx.from.id;
   const text = ctx.message.text || "";
-  
+
   // 1) Сначала создаем пользователя, если нет
   const user = await db.getUser(userId);
 
@@ -567,7 +571,7 @@ async function askOpenAIStreaming(prompt, onChunk, onComplete) {
     throw error;
   }
 }
-const userStreams = new Map(); 
+const userStreams = new Map();
 
 
 bot.on("text", async (ctx) => {
@@ -635,7 +639,7 @@ bot.on("text", async (ctx) => {
     userStreams.set(userId, true); // отмечаем активный стрим
 
     const userStyle = await db.getUserResponseStyle(userId);
-    
+
     const prompt = buildPrompt(question, cards, userStyle);
     let currentText = "🔮\n\n";
     let lastUpdate = Date.now();
@@ -654,12 +658,12 @@ bot.on("text", async (ctx) => {
                 waitingMsg.message_id,
                 undefined,
                 currentText + " 🔮"
-              ).catch(()=>{});
+              ).catch(() => { });
             }
           },
           async (finalText) => {
             await ctx.telegram.editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, finalText)
-              .catch(()=>{});
+              .catch(() => { });
             userStreams.delete(userId); // снимаем блокировку после завершения
           }
         );
@@ -668,7 +672,7 @@ bot.on("text", async (ctx) => {
         userStreams.delete(userId);
         await ctx.telegram.editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined,
           "Упс, что-то пошло не так при обращении к ИИ. Попробуй ещё раз 🙏"
-        ).catch(()=>{});
+        ).catch(() => { });
       }
     })();
 
