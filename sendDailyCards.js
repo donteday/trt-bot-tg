@@ -42,11 +42,11 @@ async function sendDailyCards(bot, tarotDeck, options = {}) {
 
                     await bot.telegram.sendPhoto(
                         userId,
-                        { source: `./img/${card.id}.jpg` },
+                        { source: `./img/dailycard.png` },
                         {
-                            caption: `🃏 Ваша карта дня — ${card.name}\n\nХотите персональную интерпретацию по вашей дате рождения?`,
+                            caption: `🃏 Ваша карта дня — готова!\n\nХотите получить персональную интерпретацию по вашей дате рождения и узнать влияние на ваш знак зодиака ❓\n🎯 Расшифровать карту: -1 запрос`,
                             ...Markup.inlineKeyboard([
-                                [Markup.button.callback('🔮 Подробнее (-1 вопрос)', `daily_more_${card.id}`)],
+                                [Markup.button.callback('🔮 Открыть', `daily_more_${card.id}`)],
                                 [Markup.button.callback('🔕 Отключить карту дня', 'daily_disable')]
                             ])
                         }

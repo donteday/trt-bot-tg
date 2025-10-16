@@ -18,7 +18,7 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const sendChangeStyleMessage = require("./commands/style.js");
 const { styleConfig } = require("./configs/configs.js");
-const { dailyCardHandlers, buildDailyCardPrompt } = require("./commands/daily.js");
+const { dailyCardHandlers, buildDailyCardPrompt, getCardName } = require("./commands/daily.js");
 
 const bot = new Telegraf(TELEGRAM_TOKEN);
 
@@ -26,6 +26,11 @@ cron.schedule('0 9 * * *', async () => {
   // 09:00 каждый день
   await sendDailyCards(bot, tarotDeck, { batchSize: 25, batchDelay: 2000 });
 });
+// (async () => {
+//   console.log('📢 Тест рассылки карт дня начат');
+//   await sendDailyCards(bot, tarotDeck, { batchSize: 5, batchDelay: 1000 });
+//   console.log('✅ Рассылка завершена');
+// })();
 
 bot.catch((err, ctx) => {
   console.error(`❌ Ошибка в апдейте для ${ctx.updateType}`, err);
@@ -41,16 +46,15 @@ bot.catch((err, ctx) => {
 });
 
 bot.telegram.setMyCommands([
-  { command: 'price', description: '💎 Узнать цены' },
-  { command: 'balance', description: '💰 Мой баланс' },
+  { command: 'daily', description: '☘️ Карта дня' },
   { command: 'mycollection', description: '📚 Моя коллекция' },
   { command: 'style', description: '🎭 Стиль ответов' },
-  { command: 'daily', description: '☘️ Карта дня' }
+  { command: 'balance', description: '💰 Мой баланс' },
+  { command: 'price', description: '💎 Узнать цены' }
 ]);
 
 const app = express();
 app.use(bodyParser.json());
-
 // Глобальный обработчик непойманных ошибок
 process.on('unhandledRejection', (error) => {
   if (error.response?.error_code === 403 && error.response?.description.includes('blocked')) {
@@ -204,12 +208,21 @@ bot.action(/^daily_more_(.+)$/, async (ctx) => {
 
     return;
   }
+  await ctx.deleteMessage().catch(() => { });
   if (!existing || !existing.interpretation || existing.date !== today) {
     await db.useQuestion(userId);
+    await ctx.replyWithPhoto(
+      { source: `./img/${cardId}.jpg` },
+      { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` }
+    );
     const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
     askOpenAIDailyCard(ctx, card.name, user.birthday, today, waitingMsg);
 
   } else {
+    await ctx.replyWithPhoto(
+      { source: `./img/${cardId}.jpg` },
+      { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` }
+    );
     await ctx.reply(`${existing.interpretation}`);
   }
 
@@ -509,8 +522,9 @@ bot.start(async (ctx) => {
     "Например: «Что мне учесть при смене работы? Что у меня будет с ним (ней)»\n" +
     `Просто напиши — и карты расскажут все!\n\n` +
 
-    "💎 Собирай коллекции карт и получай дополнительные запросы, подробнее /mycollection \n" +
-    "🎭 Выбирай свой стиль ответа бота /style💎"
+    "🍀 Карта дня /daily \n" +
+    "💎 Ваша коллекции карт /mycollection \n" +
+    "🎭 Cтиль ответа бота /style"
   );
 });
 
@@ -710,7 +724,13 @@ bot.on("text", async (ctx) => {
     const cardId = userState.cardId;
     userStates.delete(userId);
     const card = tarotDeck.find(c => c.id === cardId);
+    await ctx.replyWithPhoto(
+      { source: `./img/${cardId}.jpg` },
+      { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` }
+
+    );
     const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
+
     askOpenAIDailyCard(ctx, card.name, question, today, waitingMsg);
     return;
   }
