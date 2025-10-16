@@ -10,15 +10,22 @@ const db = require('./db.js');
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const { tarotDeck } = require("./deck/deck.js");
+const dayjs = require('dayjs');
 const https = require("https");
-
-const bot = new Telegraf(TELEGRAM_TOKEN);
-
+const cron = require('node-cron');
+const { sendDailyCards } = require('./sendDailyCards.js');
 const express = require("express");
 const bodyParser = require("body-parser");
 const sendChangeStyleMessage = require("./commands/style.js");
 const { styleConfig } = require("./configs/configs.js");
-const { log } = require("console");
+const { dailyCardHandlers, buildDailyCardPrompt } = require("./commands/daily.js");
+
+const bot = new Telegraf(TELEGRAM_TOKEN);
+
+cron.schedule('0 9 * * *', async () => {
+  // 09:00 каждый день
+  await sendDailyCards(bot, tarotDeck, { batchSize: 25, batchDelay: 2000 });
+});
 
 bot.catch((err, ctx) => {
   console.error(`❌ Ошибка в апдейте для ${ctx.updateType}`, err);
@@ -38,6 +45,7 @@ bot.telegram.setMyCommands([
   { command: 'balance', description: '💰 Мой баланс' },
   { command: 'mycollection', description: '📚 Моя коллекция' },
   { command: 'style', description: '🎭 Стиль ответов' },
+  { command: 'daily', description: '☘️ Карта дня' }
 ]);
 
 const app = express();
@@ -105,9 +113,9 @@ bot.action(/buy_questions_(\d+)/, async (ctx) => {
   const packageId = parseInt(ctx.match[1]);
   const packages = {
     1: { amount: 3, price: 49 },
-    2: { amount: 10, price: 99 },
-    3: { amount: 40, price: 299 },
-    4: { amount: 100, price: 499 }
+    2: { amount: 10, price: 149 },
+    3: { amount: 25, price: 299 },
+    4: { amount: 50, price: 499 }
   };
   const selectedPackage = packages[packageId];
 
@@ -176,13 +184,50 @@ bot.action(/style_(\d+)/, async (ctx) => {
   }
 });
 
+bot.action(/^daily_more_(.+)$/, async (ctx) => {
+  const userId = ctx.from.id;
+  const cardId = ctx.match[1];
+  const user = await getUser(userId);
+  const card = tarotDeck.find(c => c.id === cardId);
+  const today = dayjs().format('YYYY-MM-DD');
+  const existing = db.getDailyCard(userId, today);
+
+  if (user.questionsLeft <= 0) {
+    await ctx.reply('🚫 Необходимо пополнить баланс.');
+    return sendNoQuestionsMessage(ctx);
+  }
+
+  if (!user.birthday) {
+    // Запрашиваем дату рождения
+    await ctx.reply('📅 Введите дату рождения в формате ДД.ММ.ГГГГ');
+    userStates.set(userId, { action: 'daily_birthday', cardId });
+
+    return;
+  }
+  if (!existing || !existing.interpretation || existing.date !== today) {
+    await db.useQuestion(userId);
+    const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
+    askOpenAIDailyCard(ctx, card.name, user.birthday, today, waitingMsg);
+
+  } else {
+    await ctx.reply(`${existing.interpretation}`);
+  }
+
+});
+
+bot.action('daily_disable', async (ctx) => {
+  const userId = ctx.from.id;
+  db.toggleDailyNotifications(userId);
+  await ctx.reply('🚫 Вы отключили рассылку карт дня.');
+});
+
 async function sendNoQuestionsMessage(ctx) {
   return ctx.reply(
-    "🌟 Закончились вопросы, выбери пакет, чтобы продолжить 🌟",
+    "🌟 Закончились запросы, выбери пакет, чтобы продолжить 🌟",
     Markup.inlineKeyboard([
-      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
-      [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
-      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
+      [Markup.button.callback("💎 50 запросов — 499₽", "buy_questions_4")],
+      [Markup.button.callback("🌌 25 запросов — 299₽", "buy_questions_3")],
+      [Markup.button.callback("🔮 10 запросов — 149₽", "buy_questions_2")],
       [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
       [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
@@ -217,9 +262,9 @@ bot.command("price", async (ctx) => {
   await ctx.reply(
     "Выбери пакет запросов🌟",
     Markup.inlineKeyboard([
-      [Markup.button.callback("💎 100 запросов — 499₽", "buy_questions_4")],
-      [Markup.button.callback("🌌 40 запросов — 299₽", "buy_questions_3")],
-      [Markup.button.callback("🔮 10 запросов — 99₽", "buy_questions_2")],
+      [Markup.button.callback("💎 50 запросов — 499₽", "buy_questions_4")],
+      [Markup.button.callback("🌌 25 запросов — 299₽", "buy_questions_3")],
+      [Markup.button.callback("🔮 10 запросов — 149₽", "buy_questions_2")],
       [Markup.button.callback("✨ 3 запроса — 49₽", "buy_questions_1")],
       [Markup.button.callback("🎁 Получить бесплатно", "get_free_questions")]
     ])
@@ -228,6 +273,9 @@ bot.command("price", async (ctx) => {
 });
 bot.command("style", async (ctx) => {
   await sendChangeStyleMessage(ctx);
+});
+bot.command("daily", async (ctx) => {
+  await dailyCardHandlers(ctx);
 });
 
 // Состояния для сбора email
@@ -573,7 +621,63 @@ async function askOpenAIStreaming(prompt, onChunk, onComplete) {
 }
 const userStreams = new Map();
 
+function askOpenAIDailyCard(ctx, card, birthday, today, waitingMsg) {
+  const userId = ctx.from.id;
 
+  const prompt = buildDailyCardPrompt(card, birthday, today);
+  let currentText = "🔮\n\n";
+  let lastUpdate = Date.now();
+  userStreams.set(userId, true); // отмечаем активный стрим
+
+  (async () => {
+    try {
+      await askOpenAIStreaming(
+        prompt,
+        async (chunk) => {
+          currentText += chunk;
+          if (Date.now() - lastUpdate > 2000) {
+            lastUpdate = Date.now();
+            await ctx.telegram.editMessageText(
+              waitingMsg.chat.id,
+              waitingMsg.message_id,
+              undefined,
+              currentText + " 🔮"
+            ).catch(() => { });
+          }
+        },
+        async (finalText) => {
+          try {
+            // Финальное обновление текста в Telegram
+            await ctx.telegram.editMessageText(
+              waitingMsg.chat.id,
+              waitingMsg.message_id,
+              undefined,
+              finalText
+            ).catch(() => { });
+
+            // --- ✅ Сохраняем интерпретацию в базу ---
+            const today = dayjs().format('YYYY-MM-DD');
+            db.saveDailyInterpretation(userId, today, finalText);
+
+          } catch (err) {
+            console.error("Ошибка при сохранении интерпретации:", err);
+          } finally {
+            userStreams.delete(userId);
+          }
+        }
+      );
+    } catch (err) {
+      console.error(err);
+      userStreams.delete(userId);
+      await ctx.telegram.editMessageText(
+        waitingMsg.chat.id,
+        waitingMsg.message_id,
+        undefined,
+        "Упс, что-то пошло не так при обращении к ИИ. Попробуй ещё раз 🙏"
+      ).catch(() => { });
+    }
+  })();
+}
 bot.on("text", async (ctx) => {
   const userId = ctx.from.id;
   const question = (ctx.message?.text || "").trim();
@@ -585,6 +689,31 @@ bot.on("text", async (ctx) => {
   }
 
   const userState = userStates.get(userId);
+
+  if (userState?.action === 'daily_birthday') {
+    const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
+
+    if (!dateRegex.test(question)) {
+      return ctx.reply('❌ Введите дату в формате ДД.ММ.ГГГГ (например, 12.07.1995)');
+    }
+
+    db.setUserBirthdate(userId, question);
+    await ctx.reply(`✅ Дата рождения сохранена: ${question}`);
+
+    const user = db.getUser(userId);
+    if (user.questionsLeft <= 0) {
+      return sendNoQuestionsMessage(ctx);
+    }
+
+    await db.useQuestion(userId);
+    const today = dayjs().format('YYYY-MM-DD');
+    const cardId = userState.cardId;
+    userStates.delete(userId);
+    const card = tarotDeck.find(c => c.id === cardId);
+    const waitingMsg = await ctx.reply("🔮 Ожидаю расшифровку...");
+    askOpenAIDailyCard(ctx, card.name, question, today, waitingMsg);
+    return;
+  }
 
   // Обработка email
   if (userState && userState.action === 'buy_questions') {
