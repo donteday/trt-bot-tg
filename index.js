@@ -211,6 +211,8 @@ bot.action(/^daily_more_(.+)$/, async (ctx) => {
   await ctx.deleteMessage().catch(() => { });
   if (!existing || !existing.interpretation || existing.date !== today) {
     await db.useQuestion(userId);
+    console.log(cardId, "id card");
+    
     await ctx.replyWithPhoto(
       { source: `./img/${cardId}.jpg` },
       { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` }
