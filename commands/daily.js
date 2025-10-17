@@ -69,10 +69,9 @@ async function dailyCardHandlers(ctx) {
 }
 
 
-
-
 function getCardName(cardId) {
-    return tarotDeck[cardId].name;
+  const card = tarotDeck.find(c => c.id === cardId);
+  return card ? card.name : " ";
 }
 
 function buildDailyCardPrompt(card, birthday, date) {
