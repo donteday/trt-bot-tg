@@ -31,6 +31,16 @@ const SUIT_EMOJI = {
   Major: "✨",
 };
 
+function formatCardLine(card) {
+  const suitEmoji =
+    card.suit === "Major"
+      ? SUIT_EMOJI.Major
+      : SUIT_EMOJI[card.suit] || "🃏";
+
+  const dir = card.reversed ? " (перевёрнутая)" : "";
+  return `${suitEmoji} ${card.name}${dir}`;
+}
+
 module.exports = {
   isValidQuestion,
   sendNoQuestionsMessage,
