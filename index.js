@@ -34,6 +34,7 @@ const { buyQuestionsAction } = require("./actions/buyQuestions");
 const { getFreeQuestionsAction } = require("./actions/getFreeQuestions");
 const { changeStyleAction } = require("./actions/changeStyle");
 const { dailyMoreAction, dailyDisableAction } = require("./actions/daily");
+const { loveCommand } = require("./commands/love");
 
 // ========================================
 //  🚀 Инициализация
@@ -53,11 +54,11 @@ cron.schedule('0 9 * * *', async () => {
   // 09:00 каждый день
   await sendDailyCards(bot, tarotDeck, { batchSize: 25, batchDelay: 2000 });
 });
-(async () => {
-  console.log('📢 Тест рассылки карт дня начат');
-  await sendDailyCards(bot, tarotDeck, { batchSize: 5, batchDelay: 1000 });
-  console.log('✅ Рассылка завершена');
-})();
+// (async () => {
+//   console.log('📢 Тест рассылки карт дня начат');
+//   await sendDailyCards(bot, tarotDeck, { batchSize: 5, batchDelay: 1000 });
+//   console.log('✅ Рассылка завершена');
+// })();
 
 bot.catch((err, ctx) => {
   console.error(`❌ Ошибка в апдейте для ${ctx.updateType}`, err);
@@ -141,6 +142,7 @@ if (process.env.NODE_ENV !== "develop") {
 
 bot.telegram.setMyCommands([
   { command: 'daily', description: '☘️ Карта дня' },
+  { command: 'love', description: '💞 Совместимость' },
   { command: 'mycollection', description: '📚 Моя коллекция' },
   { command: 'style', description: '🎭 Стиль ответов' },
   { command: 'balance', description: '💰 Мой баланс' },
@@ -160,6 +162,8 @@ bot.command("style", sendChangeStyleMessage);
 bot.command("daily", dailyCardHandlers);
 bot.command('mycollection', collectionCommand);
 bot.command("balance", balanceCommand);
+bot.command("love", loveCommand);
+
 
 // ========================================
 //  💬 Обработка текстовых сообщений

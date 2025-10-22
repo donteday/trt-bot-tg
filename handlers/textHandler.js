@@ -16,6 +16,7 @@ const {
   SUIT_EMOJI,
 } = require("../utils");
 const { getCardName, buildDailyCardPrompt } = require("../commands/daily");
+const { handleLoveSteps } = require("../commands/love");
 
 /**
  * Основная обработка текстовых сообщений пользователя.
@@ -36,7 +37,9 @@ module.exports = function registerTextHandler(bot) {
     }
 
     const userState = userStates.get(userId);
-
+    if (userState?.action?.startsWith("love_")) {
+        return handleLoveSteps(ctx);
+      }
     // 📅 Обработка ввода даты рождения
     if (userState?.action === "daily_birthday") {
       const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
