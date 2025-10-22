@@ -32,7 +32,6 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
   userStreams.set(userId, { abortController });
 
   let fullResponse = "";
-  let streamCompleted = false;
   try {
     const response = await fetch(API_URL, {
       method: "POST",
@@ -95,12 +94,6 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
     }
     throw error;
   } finally {
-    if (!streamCompleted) {
-      // 🔧 fallback: гарантированно вызвать onComplete
-      try {
-        await onComplete(fullResponse);
-      } catch {}
-    }
     userStreams.delete(userId);
   }
 
