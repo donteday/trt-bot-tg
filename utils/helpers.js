@@ -41,8 +41,33 @@ function formatCardLine(card) {
   return `${suitEmoji} ${card.name}${dir}`;
 }
 
+/**
+ * Разбивает длинный текст на части, чтобы не превышать лимит Telegram (4096 символов)
+ * @param {string} text - исходный текст
+ * @param {number} [maxLen=3500] - максимальная длина каждого куска
+ * @returns {string[]} массив частей
+ */
+function splitIntoChunks(text, maxLen = 3500) {
+  if (typeof text !== "string") return [];
+  const chunks = [];
+  let remaining = text;
+
+  while (remaining.length > maxLen) {
+    // стараемся порезать по границе абзаца или строки
+    let cutAt = remaining.lastIndexOf("\n", maxLen);
+    if (cutAt === -1) cutAt = maxLen;
+    chunks.push(remaining.slice(0, cutAt));
+    remaining = remaining.slice(cutAt);
+  }
+
+  if (remaining.trim()) chunks.push(remaining);
+  return chunks;
+}
+
+
 module.exports = {
   isValidQuestion,
   sendNoQuestionsMessage,
-  SUIT_EMOJI
+  SUIT_EMOJI,
+  splitIntoChunks
 };

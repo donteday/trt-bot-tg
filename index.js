@@ -35,6 +35,7 @@ const { getFreeQuestionsAction } = require("./actions/getFreeQuestions");
 const { changeStyleAction } = require("./actions/changeStyle");
 const { dailyMoreAction, dailyDisableAction } = require("./actions/daily");
 const { loveCommand } = require("./commands/love");
+const { loveFullAction } = require("./actions/loveFull");
 
 // ========================================
 //  🚀 Инициализация
@@ -156,6 +157,7 @@ bot.action("get_free_questions", getFreeQuestionsAction);
 bot.action(/style_(\d+)/, changeStyleAction);
 bot.action(/^daily_more_(.+)$/, dailyMoreAction);
 bot.action('daily_disable', dailyDisableAction);
+bot.action("love_full", loveFullAction);
 
 bot.command("price", priceCommand);
 bot.command("style", sendChangeStyleMessage);

@@ -4,6 +4,7 @@ const { askOpenAIStreaming, userStreams } = require("../utils/streaming");
 const { buildLovePromptShort } = require("../utils/lovePrompts");
 const { isValidQuestion } = require("../utils/helpers");
 const { userStates } = require("../state/userStates");
+const { setLovePair } = require("../state/loveCache");
 
 /**
  * Команда /love — пошаговый ввод для анализа совместимости
@@ -22,7 +23,6 @@ async function handleLoveSteps(ctx) {
   const userId = ctx.from.id;
   const state = userStates.get(userId);
   const text = (ctx.message?.text || "").trim();
-  console.log(userId, "st1");
 
   // 🔹 Шаг 1 — ввод первого человека
   if (state?.action === "love_step1") {
@@ -35,7 +35,6 @@ async function handleLoveSteps(ctx) {
 
     return ctx.reply("💞 Теперь введите имя и дату рождения второго человека\n(например: Настя 10.04.2002)");
   }
-  console.log(state, "st2");
 
   // 🔹 Шаг 2 — ввод второго человека и запуск анализа
   if (state?.action === "love_step2") {
@@ -45,7 +44,7 @@ async function handleLoveSteps(ctx) {
 
     const [, name2, date2] = match;
     const { name1, date1 } = state;
-
+    setLovePair(userId, name1, date1, name2, date2);
     userStates.delete(userId);
 
     const prompt = buildLovePromptShort(name1, date1, name2, date2);
@@ -87,14 +86,15 @@ async function handleLoveSteps(ctx) {
               .catch(() => { });
 
             // 🆕 Отправляем отдельное сообщение с кнопкой
-            userStates.set(userId, {
-              action: "love_full_ready",
-              name1,
-              date1,
-              name2,
-              date2
-            });
-
+            // userStates.set(userId, {
+            //   action: "love_full_ready",
+            //   name1,
+            //   date1,
+            //   name2,
+            //   date2
+            // });
+            console.log('Мини совместимость 💞', userId);
+            
             await ctx.reply(
               "💞 Хочешь узнать, насколько вы с партнёром совместимы *на всех уровнях*?\n\n" +
               "🌟 Получи **полный астрологический и нумерологический разбор по 13 параметрам**, где я подробно покажу вашу энергию, карму и точки притяжения:\n\n" +

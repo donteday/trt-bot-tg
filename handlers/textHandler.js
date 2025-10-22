@@ -80,7 +80,7 @@ module.exports = function registerTextHandler(bot) {
         await db.updateUserEmail(userId, email);
         userStates.delete(userId);
         await ctx.reply(`✅ Email сохранён!\n`);
-        return sendNoQuestionsMessage(ctx);
+        return;
       } catch (error) {
         console.error("Ошибка при сохранении email:", error);
         return ctx.reply("❌ Произошла ошибка. Попробуйте позже.");
