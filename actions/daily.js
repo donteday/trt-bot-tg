@@ -50,7 +50,7 @@ async function dailyMoreAction(ctx) {
 
         const prompt = buildDailyCardPrompt(card.name, user.birthday, today);
         console.log(prompt);
-        
+
         let currentText = "🔮\n\n";
         let lastUpdate = Date.now();
         userStreams.set(userId, true);
@@ -108,8 +108,13 @@ async function dailyMoreAction(ctx) {
  */
 async function dailyDisableAction(ctx) {
     const userId = ctx.from.id;
+    const user = await db.getUser(userId);
+    const userNotifications = user?.daily_card_notifications !== 0;
+    const toggleText = userNotifications
+        ? "🚫 Вы отключили рассылку карт дня."
+        : "✅ Вы включили рассылку карт дня.";
     await db.toggleDailyNotifications(userId);
-    await ctx.reply("🚫 Вы отключили рассылку карт дня.");
+    await ctx.reply(toggleText);
 }
 
 module.exports = {

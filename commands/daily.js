@@ -19,11 +19,11 @@ async function dailyCardHandlers(ctx) {
     const cardImage = `./img/${card.id}.jpg`;
     const existing = db.getDailyCard(userId, today);
     const user = await db.getUser(userId);
-    const userNotifications = user?.daily_card_notifications;
+    const userNotifications = user?.daily_card_notifications !== 0;
+    const toggleText = userNotifications
+        ? "🔕 Отключить карту дня"
+        : "🔔 Включить карту дня";
 
-    if (!userNotifications) {
-        db.toggleDailyNotifications(userId);
-    }
 
     if (existing) {
         if (!existing.interpretation) {
@@ -33,8 +33,8 @@ async function dailyCardHandlers(ctx) {
                     {
                         caption: `🃏 Ваша карта дня — ${getCardName(existing.cardId)}\n\nХотите персональную интерпретацию по вашей дате рождения?`,
                         ...Markup.inlineKeyboard([
-                            [Markup.button.callback('🔮 Подробнее (-1 вопрос)', `daily_more_${existing.cardId}`)],
-                            [Markup.button.callback('🔕 Отключить карту дня', 'daily_disable')]
+                            [Markup.button.callback('🔮 Подробнее', `daily_more_${existing.cardId}`)],
+                            [Markup.button.callback(toggleText, 'daily_disable')]
                         ])
                     }
                 );
@@ -62,7 +62,7 @@ async function dailyCardHandlers(ctx) {
             caption: `🃏 Ваша карта дня — ${card.name} ${SUIT_EMOJI[card.suit]}\n\nХотите персональную интерпретацию по вашей дате рождения?`,
             ...Markup.inlineKeyboard([
                 [Markup.button.callback('🔮 Подробнее (-1 вопрос)', `daily_more_${card.id}`)],
-                [Markup.button.callback('🔕 Отключить карту дня', 'daily_disable')]
+                [Markup.button.callback(toggleText, 'daily_disable')]
             ])
         }
     );
@@ -70,8 +70,8 @@ async function dailyCardHandlers(ctx) {
 
 
 function getCardName(cardId) {
-  const card = tarotDeck.find(c => c.id === cardId);
-  return card ? card.name : " ";
+    const card = tarotDeck.find(c => c.id === cardId);
+    return card ? card.name : " ";
 }
 
 function buildDailyCardPrompt(card, birthday, date) {
@@ -103,7 +103,7 @@ function buildDailyCardPrompt(card, birthday, date) {
   
   Создай уникальное сообщение, которое даст конкретные ориентиры на день.
   `.trim();
-  }
+}
 
 
 module.exports = {
