@@ -7,6 +7,8 @@ const { getCardName } = require("../commands/daily");
 const { buildDailyCardPrompt } = require("../commands/daily");
 const { askOpenAIStreaming, userStreams } = require("../utils/streaming");
 const { userStates } = require("../state/userStates");
+const { sendNoQuestionsMessage } = require("../utils/helpers");
+
 
 /**
  * Действие "daily_more_X" — показать полную расшифровку карты дня.
