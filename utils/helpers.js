@@ -64,10 +64,65 @@ function splitIntoChunks(text, maxLen = 3500) {
   return chunks;
 }
 
+async function handleBotError(ctx, error, source = "") {
+  const userId = ctx?.from?.id;
+  const tag = source ? `[${source}]` : "";
+
+  // Логируем
+  console.error(`❌ Ошибка ${tag}:`, error.description || error.message || error);
+
+  // 1️⃣ Блокировка — пользователь заблокировал бота
+  if (error.response?.error_code === 403) {
+    console.log(`🚫 Пользователь ${userId} заблокировал бота`);
+    // if (userId) {
+    //   try {
+    //     await db.run("UPDATE users SET isBlocked = 1 WHERE userId = ?", [userId]);
+    //   } catch (dbErr) {
+    //     console.error("⚠️ Ошибка при пометке isBlocked:", dbErr.message);
+    //   }
+    // }
+    return; // просто выходим
+  }
+
+  // 2️⃣ Сообщение слишком длинное
+  if (
+    error.response?.error_code === 400 &&
+    error.response?.description?.includes("message is too long")
+  ) {
+    console.log(`⚠️ Сообщение слишком длинное (userId: ${userId})`);
+    try {
+      await ctx.reply("⚠️ Сообщение оказалось слишком длинным, попробуйте позже.");
+    } catch {}
+    return;
+  }
+
+  // 3️⃣ Ошибка при редактировании старого сообщения (например, удалено)
+  if (
+    error.response?.error_code === 400 &&
+    error.response?.description?.includes("message to edit not found")
+  ) {
+    console.log(`⚠️ Сообщение для редактирования не найдено (userId: ${userId})`);
+    return;
+  }
+
+  // 4️⃣ Поток прерван (AbortError, Stream close)
+  if (error.name === "AbortError" || error.code === "ABORT_ERR") {
+    console.log(`🚫 Поток ${userId} прерван (AbortError)`);
+    return;
+  }
+  if (error.cause?.code === "ERR_STREAM_PREMATURE_CLOSE") {
+    console.log(`⚠️ Поток ${userId} закрылся преждевременно`);
+    return;
+  }
+
+  // 5️⃣ Неизвестная ошибка — уведомим пользователя и лог
+  console.error("⚠️ Необработанная ошибка:", error);
+}
 
 module.exports = {
   isValidQuestion,
   sendNoQuestionsMessage,
   SUIT_EMOJI,
-  splitIntoChunks
+  splitIntoChunks,
+  handleBotError
 };

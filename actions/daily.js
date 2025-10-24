@@ -7,7 +7,7 @@ const { getCardName } = require("../commands/daily");
 const { buildDailyCardPrompt } = require("../commands/daily");
 const { askOpenAIStreaming, userStreams } = require("../utils/streaming");
 const { userStates } = require("../state/userStates");
-const { sendNoQuestionsMessage } = require("../utils/helpers");
+const { sendNoQuestionsMessage, handleBotError } = require("../utils/helpers");
 
 
 /**
@@ -114,8 +114,12 @@ async function dailyDisableAction(ctx) {
     const toggleText = userNotifications
         ? "🚫 Вы отключили рассылку карт дня."
         : "✅ Вы включили рассылку карт дня.";
-    await db.toggleDailyNotifications(userId);
-    await ctx.reply(toggleText);
+    try {
+        await db.toggleDailyNotifications(userId);
+        await ctx.reply(toggleText);
+    } catch (error) {
+        await handleBotError(ctx, error, 'dailyDisable')
+    }
 }
 
 module.exports = {
