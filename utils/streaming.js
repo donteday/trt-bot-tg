@@ -56,9 +56,9 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
       signal: abortController.signal,
     });
 
-    if (!response.ok) {
+    if (!response.ok || response.headers.get("content-type")?.includes("text/html")) {
       const text = await response.text();
-      throw new Error(`DeepSeek API error: ${response.status} ${response.statusText}\n${text}`);
+      throw new Error(`⚠️ DeepSeek вернул HTML (Cloudflare error):\n${text.slice(0, 300)}...`);
     }
 
     const reader = Readable.toWeb(response.body).getReader();
