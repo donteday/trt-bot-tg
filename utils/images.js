@@ -44,4 +44,51 @@ async function generateMergedImage(cardsIds, userId) {
   return outputPath;
 }
 
-module.exports = { drawCards, generateMergedImage };
+async function generateBonusImage(cardIds, userId) {
+  try {
+    const cardWidth = 500;
+    const cardHeight = 800;
+
+    // Загружаем и ресайзим все карты
+    const cardImages = await Promise.all(
+      cardIds.map(async (id) =>
+        sharp(path.join(__dirname, "..", "img", `${id}.jpg`))
+          .resize(cardWidth, cardHeight)
+          .toBuffer()
+      )
+    );
+
+    const totalWidth = cardWidth * cardIds.length;
+    const totalHeight = cardHeight;
+
+    const { data } = await sharp({
+      create: {
+        width: totalWidth,
+        height: totalHeight,
+        channels: 3,
+        background: { r: 0, g: 0, b: 0 },
+      },
+    })
+      .composite(
+        cardImages.map((img, i) => ({
+          input: img,
+          left: i * cardWidth,
+          top: 0,
+        }))
+      )
+      .jpeg()
+      .toBuffer({ resolveWithObject: true });
+
+    const filename = `bonus-${userId}-${Date.now()}.jpg`;
+    const outputPath = path.join(__dirname, "..", filename);
+    fs.writeFileSync(outputPath, data);
+
+    return outputPath;
+  } catch (error) {
+    console.error("❌ Ошибка при генерации бонусного изображения:", error);
+    throw error;
+  }
+}
+
+
+module.exports = { drawCards, generateMergedImage, generateBonusImage };

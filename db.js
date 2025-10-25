@@ -90,6 +90,7 @@ db.prepare(`
         await addColumnIfNotExists("users", "completed_suits", "TEXT", "[]");
         await addColumnIfNotExists("users", "birthday", "TEXT");
         await addColumnIfNotExists("users", "daily_card_notifications", "INTEGER", 1);
+        await addColumnIfNotExists("users", "lastBonusDate", "TEXT");
 
 
     } catch (e) {
@@ -406,15 +407,21 @@ saveDailyInterpretation = (userId, date, interpretation) => {
 
 getAllUserIds = (onlyWithNotifications = false) => {
     if (onlyWithNotifications) {
-      return db.prepare(`
+        return db.prepare(`
         SELECT userId FROM users
         WHERE COALESCE(daily_card_notifications, 1) = 1
       `).all();
     } else {
-      return db.prepare(`SELECT userId FROM users`).all();
+        return db.prepare(`SELECT userId FROM users`).all();
     }
-  };
-  
+};
+
+function updateBonusDate(userId, date) {
+    const stmt = db.prepare("UPDATE users SET lastBonusDate = ? WHERE userId = ?");
+    stmt.run(date, userId);
+}
+
+
 // ------------------ Экспортируем все функции ------------------
 module.exports = {
     addColumnIfNotExists,
@@ -448,5 +455,6 @@ module.exports = {
     getUserBirthdate,
     setUserBirthdate,
     saveDailyInterpretation,
-    getAllUserIds
+    getAllUserIds,
+    updateBonusDate
 };

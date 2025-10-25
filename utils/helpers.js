@@ -1,4 +1,10 @@
 const { Markup } = require("telegraf");
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠️ Неотловленный Promise:", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("💥 Непойманная ошибка:", err);
+});
 
 // ✅ Проверка корректности вопроса
 function isValidQuestion(text) {
