@@ -10,20 +10,21 @@ async function bonusCommand(ctx) {
     const user = await db.getUser(userId);
     const today = dayjs().format("YYYY-MM-DD");
 
-    const BONUS_BACK_IMAGE = path.join(__dirname, "../img/123.jpg");
+    const BONUS_BACK_IMAGE = path.join(__dirname, "../img/back.jpg");
 
     // если дата совпадает с сегодняшним днём — уже использовал
     if (user?.lastBonusDate && dayjs(user.lastBonusDate).isSame(dayjs(), "day")) {
         return ctx.reply("🎴 Бонусная игра уже использована сегодня! Приходи завтра 💫");
     }
 
-    // сохраняем дату бонуса
-    // await updateBonusDate(userId, today);
-
     await ctx.replyWithPhoto(
         { source: BONUS_BACK_IMAGE },
         {
-            caption: "🎁 Ваша бонусная игра!\nНажмите, чтобы перевернуть карты и узнать свой приз 🔮",
+            caption: `🌙 Ежедневная игра судьбы!  
+Старшие Арканы открывают вам шанс получить до 10 подарочных вопросов 💎  
+
+Выберите момент, сосредоточьтесь и нажмите «Перевернуть карты» —  
+пусть судьба сама решит, сколько мудрости подарить сегодня 🔮`,
             reply_markup: {
                 inline_keyboard: [[{ text: "🃏 Перевернуть карты", callback_data: "bonus_open" }]],
             },
