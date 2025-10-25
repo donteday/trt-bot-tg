@@ -19,7 +19,7 @@ async function getFreeQuestionsAction(ctx) {
     await ctx.reply(
       `🎁 Поделись этой ссылкой с друзьями:\n${refLink}\n\n` +
         `За каждого нового друга ты получишь +3 вопроса 🔮
-        🎁 Испытайте удачу в бонусной игре /bonus`
+🎁 Испытайте удачу в бонусной игре /bonus`
     );
   } catch (error) {
     console.error("Ошибка в get_free_questions:", error);

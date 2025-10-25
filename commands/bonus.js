@@ -8,7 +8,6 @@ const path = require("path");
 async function bonusCommand(ctx) {
     const userId = ctx.from.id;
     const user = await db.getUser(userId);
-    const today = dayjs().format("YYYY-MM-DD");
 
     const BONUS_BACK_IMAGE = path.join(__dirname, "../img/back.jpg");
 
@@ -23,8 +22,7 @@ async function bonusCommand(ctx) {
             caption: `🌙 Ежедневная игра судьбы!  
 Старшие Арканы открывают вам шанс получить до 10 подарочных вопросов 💎  
 
-Выберите момент, сосредоточьтесь и нажмите «Перевернуть карты» —  
-пусть судьба сама решит, сколько мудрости подарить сегодня 🔮`,
+Больше совпадений - больше выигрыш! 🔮`,
             reply_markup: {
                 inline_keyboard: [[{ text: "🃏 Перевернуть карты", callback_data: "bonus_open" }]],
             },

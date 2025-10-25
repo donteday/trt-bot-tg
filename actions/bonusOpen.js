@@ -31,24 +31,32 @@ async function bonusOpenAction(ctx) {
     const duplicates = 4 - unique.size;
 
     // Вычисляем награду
-    let reward = 1; // базовый приз
+    let reward = 0; // базовый приз
     if (duplicates === 1) reward = 2;
     if (duplicates === 2) reward = 5;
     if (duplicates >= 3) reward = 10;
 
     // Начисляем пользователю
     await db.addQuestionsAfterPayment(userId, reward);
-    
+
 
     // Генерируем картинку 4 открытых карт
     const imagePaths = selected.map((card) => card.id);
     const bonusImage = await generateBonusImage(imagePaths, userId);
-    const resultText = [
-        `🃏 Вы открыли карты: ${names.join(", ")}`,
-        `✨ Совпадений: ${duplicates}`,
-        `💎 Начислено: +${reward} вопросов!`,
-        `Приходи завтра за новой попыткой 💫`,
-    ].join("\n");
+    let resultText = "";
+
+    if (duplicates === 0) {
+        resultText =
+            `🃏 Вы открыли карты: ${names.join(", ")}\n\n` +
+            `😅 Сегодня судьба решила немного пошутить — совпадений нет.\n` +
+            `Попробуй снова завтра, может повезёт больше 💫`;
+    } else {
+        resultText =
+            `🃏 Вы открыли карты: ${names.join(", ")}\n` +
+            `✨ Совпадений: ${duplicates}\n` +
+            `💎 Начислено: +${reward} вопросов!\n\n` +
+            `Приходи завтра за новой попыткой 🔮`;
+    }
 
     try {
         await ctx.editMessageMedia(
