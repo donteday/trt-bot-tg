@@ -59,6 +59,8 @@ async function bonusOpenAction(ctx) {
     }
 
     try {
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+
         await ctx.editMessageMedia(
             {
                 type: "photo",
