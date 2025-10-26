@@ -71,8 +71,20 @@ async function bonusOpenAction(ctx) {
                 ]),
             }
         );
-    } catch (error) {
-        console.log(error);
+    } catch (err) {
+        if (err.description?.includes("canceled by new editMessageMedia")) {
+            console.warn("⚠️ Telegram отменил прошлый editMessageMedia, отправляем новое сообщение");
+        } else {
+            console.error("❌ Ошибка при редактировании бонусного изображения:", err);
+        }
+
+        // fallback — просто отправляем новую фотку
+        await ctx.replyWithPhoto({ source: bonusImage }, {
+            caption: resultText,
+            reply_markup: {
+                inline_keyboard: [[{ text: "🎴 Попробовать завтра", callback_data: "ignore" }]],
+            },
+        });
     } finally {
         fs.unlinkSync(bonusImage);
         console.log("Бонуска 🎁 +", reward, userId);
