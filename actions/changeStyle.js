@@ -13,7 +13,7 @@ async function changeStyleAction(ctx) {
   if (!selectedStyle) {
     return ctx.answerCbQuery("❌ Неизвестный стиль");
   }
-
+  await ctx.answerCbQuery().catch(()=>{});
   try {
     await db.setUserResponseStyle(userId, styleId);
     await ctx.editMessageText(
