@@ -87,6 +87,12 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
 
     await onComplete(fullResponse);
   } catch (error) {
+    if (error.name === "AbortError" || error.code === "ABORT_ERR") {
+      console.log(`🚫 Поток ${userId} был прерван`);
+    }
+    if (error.cause?.code === "ERR_STREAM_PREMATURE_CLOSE") {
+      console.log(`⚠️ Поток ${userId} закрылся преждевременно`);
+    }
     if (abortController.signal.aborted) {
       console.log(`🚫 Поток ${userId} остановлен пользователем`);
     } else {

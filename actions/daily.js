@@ -51,7 +51,7 @@ async function dailyMoreAction(ctx) {
         const waitingMsg = await ctx.reply("🔮");
 
         const prompt = buildDailyCardPrompt(card.name, user.birthday, today);
-
+        
         let currentText = "🔮\n\n";
         let lastUpdate = Date.now();
         userStreams.set(userId, true);
