@@ -12,7 +12,8 @@ async function sendChangeStyleMessage(ctx) {
                 [Markup.button.callback("🔮 Стандартный", "style_1")],
                 [Markup.button.callback("💫 Мотивационный", "style_2")],
                 [Markup.button.callback("😈 Жесткий троль (18+)", "style_3")],
-                [Markup.button.callback("👯 Лучшая подруга", "style_4")]
+                [Markup.button.callback("👯 Лучшая подруга", "style_4")],
+                [Markup.button.callback("🃏 Уэйт", "style_5")]
             ])
         );
     } catch (error) {

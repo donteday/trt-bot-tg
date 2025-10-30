@@ -118,6 +118,8 @@ module.exports = function registerTextHandler(bot) {
 
       const userStyle = await db.getUserResponseStyle(userId);
       const prompt = buildPromptTarot(question, cards, userStyle);
+      console.log(prompt);
+      
       let currentText = "🔮\n\n";
       let lastUpdate = Date.now();
 
