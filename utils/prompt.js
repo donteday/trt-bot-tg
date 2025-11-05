@@ -5,7 +5,6 @@ const { getContext } = require("../db");
 function buildPromptTarot(question, cards, styleId = 1, userId = null) {
     const list = cards.map((c, i) => `${i + 1}. ${c.name}`).join("\n");
     let contextPart = '';
-    console.log("user id", userId);
 
     if (userId) {
         const context = getContext(userId);
