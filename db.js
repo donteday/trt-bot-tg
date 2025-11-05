@@ -77,7 +77,21 @@ db.prepare(`
       PRIMARY KEY (userId, date)
     )
   `).run();
+// В разделе создания таблиц добавь:
+db.exec(`
+  CREATE TABLE IF NOT EXISTS conversation_context (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    userId INTEGER,
+    userMessage TEXT,
+    botResponse TEXT,
+    cards TEXT, -- JSON массива карт
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (userId) REFERENCES users (userId)
+  );
+`);
 
+// Добавляем индекс для быстрого поиска
+db.exec(`CREATE INDEX IF NOT EXISTS idx_context_user_date ON conversation_context(userId, created_at DESC);`);
 
 // Авто-миграции — запускаем и логируем (используем Promise API)
 (async () => {
@@ -421,6 +435,65 @@ function updateBonusDate(userId, date) {
     stmt.run(date, userId);
 }
 
+/**
+ * Сохраняет вопрос-ответ в контекст
+ */
+function saveToContext(userId, userMessage, botResponse, cards = null) {
+  try {
+    const cardsJson = cards ? JSON.stringify(cards.map(c => ({id: c.id, name: c.name}))) : null;
+    
+    db.prepare(`
+      INSERT INTO conversation_context (userId, userMessage, botResponse, cards)
+      VALUES (?, ?, ?, ?)
+    `).run(userId, userMessage, botResponse, cardsJson);
+    
+    // Ограничиваем историю 5 последними сообщениями
+    db.prepare(`
+      DELETE FROM conversation_context 
+      WHERE userId = ? AND id NOT IN (
+        SELECT id FROM conversation_context 
+        WHERE userId = ? 
+        ORDER BY created_at DESC 
+        LIMIT 5
+      )
+    `).run(userId, userId);
+    
+  } catch (error) {
+    console.error('Error saving context:', error);
+  }
+}
+
+/**
+ * Получает последние 5 вопросов-ответов пользователя
+ */
+function getContext(userId, limit = 5) {
+  try {
+    const rows = db.prepare(`
+      SELECT userMessage, botResponse, cards, created_at
+      FROM conversation_context 
+      WHERE userId = ? 
+      ORDER BY created_at DESC 
+      LIMIT ?
+    `).all(userId, limit);
+    
+    return rows.reverse(); // Возвращаем в хронологическом порядке
+  } catch (error) {
+    console.error('Error getting context:', error);
+    return [];
+  }
+}
+
+/**
+ * Очищает контекст пользователя
+ */
+function clearContext(userId) {
+  try {
+    db.prepare('DELETE FROM conversation_context WHERE userId = ?').run(userId);
+  } catch (error) {
+    console.error('Error clearing context:', error);
+  }
+}
+
 
 // ------------------ Экспортируем все функции ------------------
 module.exports = {
@@ -456,5 +529,8 @@ module.exports = {
     setUserBirthdate,
     saveDailyInterpretation,
     getAllUserIds,
-    updateBonusDate
+    updateBonusDate,
+    saveToContext,
+    getContext,
+    clearContext
 };

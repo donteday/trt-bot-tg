@@ -38,6 +38,8 @@ const { loveCommand } = require("./commands/love");
 const { loveFullAction } = require("./actions/loveFull");
 const { bonusCommand } = require("./commands/bonus");
 const { bonusOpenAction } = require("./actions/bonusOpen");
+const { contextCommand } = require("./commands/context");
+const { clearContextAction } = require("./actions/contextActions");
 
 // ========================================
 //  🚀 Инициализация
@@ -149,6 +151,7 @@ bot.telegram.setMyCommands([
   { command: 'mycollection', description: '📚 Моя коллекция' },
   { command: 'style', description: '🎭 Стиль ответов' },
   { command: 'bonus', description: '🎁 Бонус' },
+  { command: 'context', description: '📖 История' },
   { command: 'balance', description: '💰 Мой баланс' },
   { command: 'price', description: '💎 Узнать цены' }
 ]);
@@ -162,6 +165,7 @@ bot.action(/^daily_more_(.+)$/, dailyMoreAction);
 bot.action('daily_disable', dailyDisableAction);
 bot.action("love_full", loveFullAction);
 bot.action("bonus_open", bonusOpenAction);
+bot.action("clear_context", clearContextAction);
 
 bot.command("price", priceCommand);
 bot.command("style", sendChangeStyleMessage);
@@ -170,6 +174,7 @@ bot.command('mycollection', collectionCommand);
 bot.command("balance", balanceCommand);
 bot.command("love", loveCommand);
 bot.command("bonus", bonusCommand);
+bot.command("context", contextCommand);
 
 
 // ========================================

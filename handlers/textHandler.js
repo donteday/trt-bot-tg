@@ -38,8 +38,8 @@ module.exports = function registerTextHandler(bot) {
 
     const userState = userStates.get(userId);
     if (userState?.action?.startsWith("love_")) {
-        return handleLoveSteps(ctx);
-      }
+      return handleLoveSteps(ctx);
+    }
     // 📅 Обработка ввода даты рождения
     if (userState?.action === "daily_birthday") {
       const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
@@ -117,7 +117,7 @@ module.exports = function registerTextHandler(bot) {
       userStreams.set(userId, true);
 
       const userStyle = await db.getUserResponseStyle(userId);
-      const prompt = buildPromptTarot(question, cards, userStyle);
+      const prompt = buildPromptTarot(question, cards, userStyle, userId);
       
       let currentText = "🔮\n\n";
       let lastUpdate = Date.now();
@@ -134,13 +134,14 @@ module.exports = function registerTextHandler(bot) {
                 lastUpdate = Date.now();
                 await ctx.telegram
                   .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, currentText + " 🔮")
-                  .catch(() => {});
+                  .catch(() => { });
               }
             },
             async (finalText) => {
+              db.saveToContext(userId, question, finalText, cards);
               await ctx.telegram
                 .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, finalText)
-                .catch(() => {});
+                .catch(() => { });
               userStreams.delete(userId);
             }
           );
@@ -154,7 +155,7 @@ module.exports = function registerTextHandler(bot) {
               undefined,
               "Упс, что-то пошло не так при обращении к ИИ. Попробуй ещё раз 🙏"
             )
-            .catch(() => {});
+            .catch(() => { });
         }
       })();
     } catch (err) {
@@ -184,13 +185,13 @@ async function askDailyInterpretation(ctx, card, birthday, today, waitingMsg) {
           lastUpdate = Date.now();
           await ctx.telegram
             .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, currentText + " 🔮")
-            .catch(() => {});
+            .catch(() => { });
         }
       },
       async (finalText) => {
         await ctx.telegram
           .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, finalText)
-          .catch(() => {});
+          .catch(() => { });
         await db.saveDailyInterpretation(userId, today, finalText);
         userStreams.delete(userId);
       }
