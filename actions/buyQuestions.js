@@ -15,7 +15,7 @@ async function buyQuestionsAction(ctx) {
     const packageId = parseInt(ctx.match[1], 10);
 
     const packages = {
-      1: { amount: 3, price: 49 },
+      1: { amount: 3, price: 75 },
       2: { amount: 10, price: 149 },
       3: { amount: 25, price: 299 },
       4: { amount: 50, price: 499 },
