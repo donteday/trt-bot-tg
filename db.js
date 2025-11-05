@@ -454,7 +454,7 @@ function saveToContext(userId, userMessage, botResponse, cards = null) {
         SELECT id FROM conversation_context 
         WHERE userId = ? 
         ORDER BY created_at DESC 
-        LIMIT 5
+        LIMIT 8
       )
     `).run(userId, userId);
     
@@ -466,7 +466,7 @@ function saveToContext(userId, userMessage, botResponse, cards = null) {
 /**
  * Получает последние 5 вопросов-ответов пользователя
  */
-function getContext(userId, limit = 5) {
+function getContext(userId, limit = 8) {
   try {
     const rows = db.prepare(`
       SELECT userMessage, botResponse, cards, created_at
