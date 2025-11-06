@@ -25,7 +25,7 @@ async function startCommand(ctx) {
           referrer.userId,
           "🎉 Новый пользователь зарегистрировался по твоей ссылке! Ты получил +3 вопроса 🔮"
         );
-      }
+      } else await db.setInvitedBy(userId, referralCode);
     }
 
     // 3️⃣ Приветствие
