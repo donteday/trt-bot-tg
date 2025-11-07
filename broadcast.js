@@ -1,18 +1,11 @@
-// broadcast.js
 require("dotenv").config();
 const sqlite3 = require("sqlite3").verbose();
 const { Telegraf } = require("telegraf");
 const fs = require("fs");
 
-// ✅ Только отправка — без polling
-const bot = new Telegraf(process.env.TELEGRAM_TOKEN, {
-  handlerTimeout: 0,
-});
+const bot = new Telegraf(process.env.TELEGRAM_TOKEN, { handlerTimeout: 0 });
+bot.stop = () => {}; // отключаем polling
 
-// ⚠️ Отключаем получение апдейтов
-bot.stop = () => {}; // чтобы Telegraf не лез за апдейтами
-
-// Подключение к базе
 const db = new sqlite3.Database("tarot.db");
 
 /**
@@ -22,19 +15,20 @@ async function sendBroadcast(message) {
   console.log("🔄 Начинаем рассылку...");
 
   return new Promise((resolve, reject) => {
-    db.all("SELECT userId FROM users", async (err, rows) => {
+    // 🔹 выбираем только активных пользователей
+    db.all("SELECT userId FROM users WHERE blocked = 0", async (err, rows) => {
       if (err) {
         console.error("❌ Ошибка базы данных:", err);
         reject(err);
         return;
       }
 
-      console.log(`📊 Найдено пользователей: ${rows.length}`);
+      console.log(`📊 Найдено активных пользователей: ${rows.length}`);
 
       let successCount = 0;
       let failCount = 0;
+      let blockedCount = 0;
 
-      // Отправляем с ограничением 25–30 сообщений/сек
       for (let i = 0; i < rows.length; i++) {
         const user = rows[i];
 
@@ -42,16 +36,21 @@ async function sendBroadcast(message) {
           await bot.telegram.sendMessage(user.userId, message);
           successCount++;
 
-          // Telegram лимит ~30 msg/sec ⇒ ставим 50–60 ms задержку
+          // ограничение по скорости
           await new Promise((r) => setTimeout(r, 60));
-
         } catch (error) {
           const desc = error.response?.description || error.message;
+
           if (error.response?.error_code === 403) {
             console.log(`🚫 Пользователь ${user.userId} заблокировал бота`);
+            blockedCount++;
+
+            // ⚙️ помечаем как заблокированного
+            db.prepare("UPDATE users SET blocked = 1 WHERE userId = ?").run(user.userId);
           } else {
             console.log(`❌ Ошибка для ${user.userId}: ${desc}`);
           }
+
           failCount++;
         }
 
@@ -62,8 +61,9 @@ async function sendBroadcast(message) {
 
       console.log("\n🎉 Рассылка завершена!");
       console.log(`✅ Успешно: ${successCount}`);
+      console.log(`🚫 Заблокировали: ${blockedCount}`);
       console.log(`❌ Ошибок: ${failCount}`);
-      resolve({ successCount, failCount });
+      resolve({ successCount, blockedCount, failCount });
     });
   });
 }

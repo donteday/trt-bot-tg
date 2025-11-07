@@ -40,6 +40,8 @@ const { bonusCommand } = require("./commands/bonus");
 const { bonusOpenAction } = require("./actions/bonusOpen");
 const { contextCommand } = require("./commands/context");
 const { clearContextAction } = require("./actions/contextActions");
+const { matrixCommand } = require("./commands/matrix");
+const { matrixStart } = require("./actions/matrixStart");
 
 // ========================================
 //  🚀 Инициализация
@@ -148,6 +150,7 @@ if (process.env.NODE_ENV !== "develop") {
 bot.telegram.setMyCommands([
   { command: 'daily', description: '☘️ Карта дня' },
   { command: 'love', description: '💞 Совместимость' },
+  { command: 'matrix', description: '🌌 Матрица судьбы' },
   { command: 'mycollection', description: '📚 Моя коллекция' },
   { command: 'style', description: '🎭 Стиль ответов' },
   { command: 'bonus', description: '🎁 Бонус' },
@@ -166,6 +169,7 @@ bot.action('daily_disable', dailyDisableAction);
 bot.action("love_full", loveFullAction);
 bot.action("bonus_open", bonusOpenAction);
 bot.action("clear_context", clearContextAction);
+bot.action("matrix_start", matrixStart);
 
 bot.command("price", priceCommand);
 bot.command("style", sendChangeStyleMessage);
@@ -175,6 +179,7 @@ bot.command("balance", balanceCommand);
 bot.command("love", loveCommand);
 bot.command("bonus", bonusCommand);
 bot.command("context", contextCommand);
+bot.command("matrix", matrixCommand);
 
 
 // ========================================

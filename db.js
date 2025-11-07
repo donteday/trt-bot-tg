@@ -105,6 +105,7 @@ db.exec(`CREATE INDEX IF NOT EXISTS idx_context_user_date ON conversation_contex
         await addColumnIfNotExists("users", "birthday", "TEXT");
         await addColumnIfNotExists("users", "daily_card_notifications", "INTEGER", 1);
         await addColumnIfNotExists("users", "lastBonusDate", "TEXT");
+        await addColumnIfNotExists("users", "blocked", "INTEGER", 0);
 
 
     } catch (e) {

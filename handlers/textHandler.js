@@ -17,6 +17,7 @@ const {
 } = require("../utils");
 const { getCardName, buildDailyCardPrompt } = require("../commands/daily");
 const { handleLoveSteps } = require("../commands/love");
+const { matrixHandler } = require("../commands/matrix");
 
 /**
  * Основная обработка текстовых сообщений пользователя.
@@ -85,6 +86,10 @@ module.exports = function registerTextHandler(bot) {
         console.error("Ошибка при сохранении email:", error);
         return ctx.reply("❌ Произошла ошибка. Попробуйте позже.");
       }
+    }
+
+    if (userState?.action === "matrix_date") {
+      return matrixHandler(ctx);
     }
 
     // 🧩 Проверка вопроса
