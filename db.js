@@ -503,7 +503,7 @@ function setUserBlocked(userId, blocked = 1) {
     const stmt = db.prepare("UPDATE users SET blocked = ? WHERE userId = ?");
     try {
       stmt.run(blocked, userId);
-      console.log(`🚫 Пользователь ${userId} теперь blocked = ${blocked}`);
+    //   console.log(`🚫 Пользователь ${userId} теперь blocked = ${blocked}`);
     } catch (err) {
       console.error("❌ Ошибка при обновлении blocked:", err);
     }
