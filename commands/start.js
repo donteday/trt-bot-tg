@@ -1,5 +1,6 @@
 // commands/start.js
 const db = require("../db");
+const { handleBotError } = require("../utils");
 
 /**
  * Команда /start — создаёт пользователя и обрабатывает рефералку.
@@ -41,8 +42,11 @@ async function startCommand(ctx) {
         "💎 Ваша коллекция карт /mycollection\n" +
         "🎭 Стиль ответа бота /style" 
     );
+
+    db.setUserBlocked(userId,0);
   } catch (error) {
     console.error("Ошибка при /start:", error);
+    handleBotError(error);
     await ctx.reply("❌ Произошла ошибка при запуске. Попробуйте позже.");
   }
 }

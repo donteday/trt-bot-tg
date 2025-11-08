@@ -422,14 +422,18 @@ saveDailyInterpretation = (userId, date, interpretation) => {
 
 getAllUserIds = (onlyWithNotifications = false) => {
     if (onlyWithNotifications) {
-        return db.prepare(`
+      return db.prepare(`
         SELECT userId FROM users
         WHERE COALESCE(daily_card_notifications, 1) = 1
+        AND blocked = 0
       `).all();
     } else {
-        return db.prepare(`SELECT userId FROM users`).all();
+      return db.prepare(`
+        SELECT userId FROM users
+        WHERE blocked = 0
+      `).all();
     }
-};
+  };
 
 function updateBonusDate(userId, date) {
     const stmt = db.prepare("UPDATE users SET lastBonusDate = ? WHERE userId = ?");
@@ -495,6 +499,16 @@ function clearContext(userId) {
   }
 }
 
+function setUserBlocked(userId, blocked = 1) {
+    const stmt = db.prepare("UPDATE users SET blocked = ? WHERE userId = ?");
+    try {
+      stmt.run(blocked, userId);
+      console.log(`🚫 Пользователь ${userId} теперь blocked = ${blocked}`);
+    } catch (err) {
+      console.error("❌ Ошибка при обновлении blocked:", err);
+    }
+  }
+
 
 // ------------------ Экспортируем все функции ------------------
 module.exports = {
@@ -533,5 +547,6 @@ module.exports = {
     updateBonusDate,
     saveToContext,
     getContext,
-    clearContext
+    clearContext,
+    setUserBlocked
 };

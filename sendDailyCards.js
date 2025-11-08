@@ -3,23 +3,6 @@ const dayjs = require('dayjs');
 const { Markup } = require('telegraf');
 const db = require('./db.js');
 
-
-// helper: безопасно отправить фото + длинный текст отдельным сообщением
-async function sendCardWithText(bot, userId, card, text) {
-    // caption максимум ~1024
-    const shortCaption = `🃏 Ваша карта дня — ${card.name}`;
-    await bot.telegram.sendPhoto(
-        userId,
-        { source: `./img/${card.id}.jpg` },
-        { caption: shortCaption }
-    );
-
-    if (text && text.trim()) {
-        // длинный текст отдельным сообщением
-        await bot.telegram.sendMessage(userId, `🔮 ${text}`);
-    }
-}
-
 // Основная функция рассылки
 async function sendDailyCards(bot, tarotDeck, options = {}) {
     const BATCH_SIZE = options.batchSize ?? 25;     // сколько отправляем параллельно
@@ -52,8 +35,12 @@ async function sendDailyCards(bot, tarotDeck, options = {}) {
                         }
                     );
                 }
-            } catch (e) {
-                console.log(`❌ Ошибка при отправке пользователю ${userId}: ${e.message}`);
+            } catch (error) {
+                if (error.response?.error_code === 403) {
+                    db.setUserBlocked(userId, 1);
+                    return;
+                  }
+                console.log(`❌ Ошибка при отправке пользователю ${userId}: ${error.message}`);
             }
         }));
 
