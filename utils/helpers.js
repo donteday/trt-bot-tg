@@ -1,4 +1,5 @@
 const { Markup } = require("telegraf");
+const fetch = require("node-fetch");
 process.on("unhandledRejection", (reason) => {
   console.error("⚠️ Неотловленный Promise:", reason);
 });
@@ -137,10 +138,30 @@ async function handleBotError(ctx, error, source = "") {
   console.error("⚠️ Необработанная ошибка:", error);
 }
 
+async function sendMetrikaHit(userId, eventName = 'bot_start') {
+  const counterId = process.env.YANDEX_METRIKA_ID;
+  try {
+    const url = new URL(`https://mc.yandex.ru/watch/${counterId}`);
+    const params = {
+      'page-url': `https://taroshka-bot.tilda.ws/${eventName}_${userId}`,
+      'browser-info': 'ar:1;ti:TelegramBot;pf:0;',
+      'rn': Math.random(),
+    };
+
+    url.search = new URLSearchParams(params).toString();
+    
+    const res = await fetch(url, { method: 'GET' });
+    console.log(`📈 Метрика ${eventName} отправлена для ${userId} (${res.status})`);
+  } catch (err) {
+    console.error('Ошибка Метрики:', err);
+  }
+}
+
 module.exports = {
   isValidQuestion,
   sendNoQuestionsMessage,
   SUIT_EMOJI,
   splitIntoChunks,
-  handleBotError
+  handleBotError,
+  sendMetrikaHit
 };

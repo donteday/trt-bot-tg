@@ -1,7 +1,6 @@
 // commands/start.js
 const db = require("../db");
-const { handleBotError } = require("../utils");
-const fetch = require("node-fetch");
+const { handleBotError, sendMetrikaHit } = require("../utils");
 
 /**
  * Команда /start — создаёт пользователя и обрабатывает рефералку.
@@ -32,24 +31,7 @@ async function startCommand(ctx) {
     }
     
     if (referralCode === "site") {     
-      const counterId = process.env.YANDEX_METRIKA_ID;
-
-      try {
-        await fetch(`https://mc.yandex.ru/watch/${counterId}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({
-            "browser-info": "pv:1:ss:1:ar:1",
-            "site-info": `bot_start_site`,
-            "rn": Math.random(),
-            "ut": "noindex",
-            "_ym": "1",
-          }),
-        });
-        console.log(`📈 Событие bot_start_site отправлено в Яндекс Метрику`);
-      } catch (err) {
-        console.error("⚠️ Ошибка отправки в Метрику:", err.message);
-      }
+      await sendMetrikaHit(userId, 'bot_start');
     }
     // 3️⃣ Приветствие
     await ctx.reply(
