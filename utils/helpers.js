@@ -138,20 +138,23 @@ async function handleBotError(ctx, error, source = "") {
   console.error("⚠️ Необработанная ошибка:", error);
 }
 
-async function sendMetrikaHit(userId, eventName = 'bot_start') {
+async function sendMetrikaHit(userId, eventName = 'bot_start', yclid) {
   const counterId = process.env.YANDEX_METRIKA_ID;
-  try {
-    const url = new URL(`https://mc.yandex.ru/watch/${counterId}`);
-    const params = {
-      'page-url': `https://taroshka-bot.tilda.ws/${eventName}_${userId}`,
-      'browser-info': 'ar:1;ti:TelegramBot;pf:0;',
-      'rn': Math.random(),
-    };
+  
+  // формируем "виртуальный" URL под конкретное событие
+  const pageUrl = `http://taroshka-bot.tilda.ws/${eventName}_${userId}${yclid ? `?yclid=${yclid}` : ''}`;
 
-    url.search = new URLSearchParams(params).toString();
-    
-    const res = await fetch(url, { method: 'GET' });
-    console.log(`📈 Метрика ${eventName} отправлена для ${userId} (${res.status})`);
+  const params = {
+    'page-url': pageUrl,
+    'browser-info': 'ar:1;ti:TelegramBot;',
+    'rn': Math.random(),
+  };
+
+  const url = `https://mc.yandex.ru/watch/${counterId}?${new URLSearchParams(params)}`;
+
+  try {
+    const res = await fetch(url);
+    console.log(`📈 Метрика: событие "${eventName}" отправлено (user=${userId}, yclid=${yclid || 'нет'}, статус=${res.status})`);
   } catch (err) {
     console.error('Ошибка Метрики:', err);
   }

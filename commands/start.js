@@ -8,6 +8,8 @@ const { handleBotError, sendMetrikaHit } = require("../utils");
 async function startCommand(ctx) {
   const userId = ctx.from.id;
   const text = ctx.message?.text || "";
+  const payload = ctx.startPayload; // например "yclid_1734567890123456789"
+  const yclid = payload?.startsWith('yclid_') ? payload.split('_')[1] : null;
 
   try {
     // 1️⃣ Создаём пользователя, если нет
@@ -29,10 +31,12 @@ async function startCommand(ctx) {
         );
       } else await db.setInvitedBy(userId, referralCode);
     }
-    
-    if (referralCode === "site") {     
-      await sendMetrikaHit(userId, 'bot_start');
+    if (yclid) {
+      await sendMetrikaHit(userId, "bot_start", yclid);
     }
+    // if (referralCode === "site") {     
+    //   await sendMetrikaHit(userId, 'bot_start');
+    // }
     // 3️⃣ Приветствие
     await ctx.reply(
       `✨ Приветствую в мире AI-Таро! 🔮\n\n` +
