@@ -144,12 +144,6 @@ async function sendMetrikaHit(userId, eventName = 'bot_start', yclid) {
   // формируем "виртуальный" URL под конкретное событие
   const pageUrl = `http://taroshka-bot.tilda.ws/${eventName}_${userId}${yclid ? `?yclid=${yclid}` : ''}`;
 
-<<<<<<< HEAD
-    url.search = new URLSearchParams(params).toString();
-
-    const res = await fetch(url, { method: 'GET' });
-    console.log(`📈 Метрика ${eventName} отправлена для ${userId} (${res.status})`);
-=======
   const params = {
     'page-url': pageUrl,
     'browser-info': 'ar:1;ti:TelegramBot;',
@@ -161,7 +155,6 @@ async function sendMetrikaHit(userId, eventName = 'bot_start', yclid) {
   try {
     const res = await fetch(url);
     console.log(`📈 Метрика: событие "${eventName}" отправлено (user=${userId}, yclid=${yclid || 'нет'}, статус=${res.status})`);
->>>>>>> 899dcc6b267b65bc3912b98f9b8a06e56aa45070
   } catch (err) {
     console.error('Ошибка Метрики:', err);
   }
