@@ -86,9 +86,9 @@ function splitIntoChunks(text, maxLen = 3500) {
 async function handleBotError(ctx, error, source = "") {
   const userId = ctx?.from?.id;
   const tag = source ? `[${source}]` : "";
-
+  const description = error?.response?.description;
   // Логируем
-  console.error(`❌ Ошибка ${tag}:`, error.description || error.message || error);
+  console.error(`❌ Ошибка ${tag}:`, description || error.message || error);
 
   // 1️⃣ Блокировка — пользователь заблокировал бота
   if (error.response?.error_code === 403) {
@@ -111,7 +111,7 @@ async function handleBotError(ctx, error, source = "") {
     console.log(`⚠️ Сообщение слишком длинное (userId: ${userId})`);
     try {
       await ctx.reply("⚠️ Сообщение оказалось слишком длинным, попробуйте позже.");
-    } catch {}
+    } catch { }
     return;
   }
 
@@ -149,7 +149,7 @@ async function sendMetrikaHit(userId, eventName = 'bot_start') {
     };
 
     url.search = new URLSearchParams(params).toString();
-    
+
     const res = await fetch(url, { method: 'GET' });
     console.log(`📈 Метрика ${eventName} отправлена для ${userId} (${res.status})`);
   } catch (err) {
