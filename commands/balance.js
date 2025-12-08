@@ -9,7 +9,6 @@ async function balanceCommand(ctx) {
   try {
     const user = await getUser(ctx.from.id);
     const questionsLeft = user.questionsLeft || 0;
-    console.log(questionsLeft);
     const idUser = ctx.from.id;
 
     await ctx.reply(
