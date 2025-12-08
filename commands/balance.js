@@ -8,11 +8,13 @@ const { getUser } = require("../db");
 async function balanceCommand(ctx) {
   try {
     const user = await getUser(ctx.from.id);
+    const idUser = ctx.from.id;
     const fateStatus = user.fateUsed ? "❌ уже использована" : "✅ доступна";
 
     await ctx.reply(
       `📊 Баланс:\n` +
       `Осталось вопросов: ${user.questionsLeft}\n`
+      `Ваш Id: ${idUser}\n`
     );
   } catch (error) {
     console.error("Ошибка при /balance:", error);
