@@ -51,7 +51,7 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
         ],
         stream: true,
         temperature: 1,
-        max_tokens: 2000,
+        max_tokens: 3500,
       }),
       signal: abortController.signal,
     });
