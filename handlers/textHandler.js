@@ -21,10 +21,6 @@ const { matrixHandler } = require("../commands/matrix");
 
 /**
  * Основная обработка текстовых сообщений пользователя.
- * Здесь:
- * - определяются состояния (ввод email / даты рождения)
- * - выполняются расклады
- * - происходит стриминг ответа от DeepSeek
  */
 module.exports = function registerTextHandler(bot) {
   bot.on("text", async (ctx) => {
@@ -38,10 +34,11 @@ module.exports = function registerTextHandler(bot) {
     }
 
     const userState = userStates.get(userId);
+
     if (userState?.action?.startsWith("love_")) {
       return handleLoveSteps(ctx);
     }
-    // 📅 Обработка ввода даты рождения
+
     if (userState?.action === "daily_birthday") {
       const dateRegex = /^\d{2}\.\d{2}\.\d{4}$/;
       if (!dateRegex.test(question)) {
@@ -60,16 +57,20 @@ module.exports = function registerTextHandler(bot) {
       userStates.delete(userId);
       const card = tarotDeck.find((c) => c.id === cardId);
 
-      await ctx.replyWithPhoto(
-        { source: `./img/${cardId}.jpg` },
-        { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` }
-      );
+      // Отправка фото через поток и удаление после отправки
+      try {
+        const stream = fs.createReadStream(`./img/${cardId}.jpg`);
+        await ctx.replyWithPhoto({ source: stream }, { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` });
+        stream.close();
+      } catch (err) {
+        console.error("Ошибка отправки карты дня:", err);
+        await ctx.reply("❌ Не удалось отправить изображение карты дня.");
+      }
 
       const waitingMsg = await ctx.reply("🔮");
       return askDailyInterpretation(ctx, card.name, question, today, waitingMsg);
     }
 
-    // 💌 Обработка email при покупке
     if (userState?.action === "buy_questions") {
       const email = question;
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -92,12 +93,10 @@ module.exports = function registerTextHandler(bot) {
       return matrixHandler(ctx);
     }
 
-    // 🧩 Проверка вопроса
     if (!question || !isValidQuestion(question)) {
       return ctx.reply("❌ Пожалуйста, задай корректный вопрос (не менее 2 слов).");
     }
 
-    // 💎 Проверка баланса
     const user = await db.getUser(userId);
     if (user.questionsLeft <= 0) return sendNoQuestionsMessage(ctx);
     const ok = await db.useQuestion(userId);
@@ -115,15 +114,24 @@ module.exports = function registerTextHandler(bot) {
       if (collectionResult) await ctx.reply(collectionResult.message);
 
       const mergedImage = await generateMergedImage(cardsIds, userId);
-      await ctx.replyWithPhoto({ source: mergedImage });
-      fs.unlinkSync(mergedImage);
+
+      // Отправка фото через поток + удаление после отправки
+      try {
+        const stream = fs.createReadStream(mergedImage);
+        await ctx.replyWithPhoto({ source: stream });
+        stream.close();
+        fs.unlink(mergedImage, (err) => err && console.error("Ошибка удаления файла:", err));
+      } catch (err) {
+        console.error("Ошибка отправки фото расклада:", err);
+        await ctx.reply("❌ Не удалось отправить изображение расклада.");
+      }
 
       const waitingMsg = await ctx.reply("🔮");
       userStreams.set(userId, true);
 
       const userStyle = await db.getUserResponseStyle(userId);
       const prompt = buildPromptTarot(question, cards, userStyle, userId);
-      
+
       let currentText = "🔮\n\n";
       let lastUpdate = Date.now();
 
