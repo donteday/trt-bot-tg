@@ -4,34 +4,26 @@ const fetch = require("node-fetch");
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const API_URL = "https://api.deepseek.com/v1/chat/completions";
 
-// 🧠 карта активных стримов по userId
 const userStreams = new Map();
 
-/**
- * Потоковый запрос к DeepSeek API
- * @param {number|string} userId - ID пользователя
- * @param {string} prompt - Вопрос
- * @param {function} onChunk - Колбэк при каждом фрагменте
- * @param {function} onComplete - Колбэк по завершении
- */
 async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
   if (!DEEPSEEK_API_KEY) throw new Error("DEEPSEEK_API_KEY не установлен");
-  if (!prompt || typeof prompt !== "string")
-    throw new Error("Неверный формат prompt");
+  if (!prompt || typeof prompt !== "string") throw new Error("Неверный формат prompt");
 
-  // если у пользователя уже идёт стрим — отменяем его
+  // Прерываем старый поток, если есть
   if (userStreams.has(userId)) {
-  const streamData = userStreams.get(userId);
-  if (streamData?.abortController) {
-    console.log(`⚠️ Прерываю поток пользователя ${userId}`);
-    streamData.abortController.abort();
+    const streamData = userStreams.get(userId);
+    if (streamData?.abortController) {
+      console.log(`⚠️ Прерываю поток пользователя ${userId}`);
+      streamData.abortController.abort();
+    }
   }
-}
 
   const abortController = new AbortController();
   userStreams.set(userId, { abortController });
 
   let fullResponse = "";
+
   try {
     const response = await fetch(API_URL, {
       method: "POST",
@@ -61,15 +53,18 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
       throw new Error(`⚠️ DeepSeek вернул HTML (Cloudflare error):\n${text.slice(0, 300)}...`);
     }
 
-    const reader = Readable.toWeb(response.body).getReader();
     const decoder = new TextDecoder("utf-8");
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+    // Node.js stream
+    const stream = response.body;
 
-      const chunk = decoder.decode(value, { stream: true });
-      const lines = chunk.split("\n");
+    stream.on("error", (err) => {
+      console.error(`❌ Поток пользователя ${userId} завершился с ошибкой:`, err);
+    });
+
+    stream.on("data", async (chunk) => {
+      const str = decoder.decode(chunk, { stream: true });
+      const lines = str.split("\n");
 
       for (const line of lines) {
         if (line.startsWith("data: ") && line !== "data: [DONE]") {
@@ -80,21 +75,28 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
               fullResponse += content;
               await onChunk(content);
             }
-          } catch {}
+          } catch (e) {
+            // игнорируем JSON ошибки
+          }
         }
       }
-    }
+    });
+
+    await new Promise((resolve, reject) => {
+      stream.on("end", resolve);
+      stream.on("close", resolve);
+      stream.on("error", reject);
+      abortController.signal.addEventListener("abort", () => {
+        reject(new Error("AbortError"));
+      });
+    });
 
     await onComplete(fullResponse);
   } catch (error) {
-    if (error.name === "AbortError" || error.code === "ABORT_ERR") {
-      console.log(`🚫 Поток ${userId} был прерван`);
-    }
-    if (error.cause?.code === "ERR_STREAM_PREMATURE_CLOSE") {
-      console.log(`⚠️ Поток ${userId} закрылся преждевременно`);
-    }
-    if (abortController.signal.aborted) {
+    if (error.message === "AbortError") {
       console.log(`🚫 Поток ${userId} остановлен пользователем`);
+    } else if (error.code === "ECONNRESET") {
+      console.log(`⚠️ Поток ${userId} был сброшен соединением (ECONNRESET)`);
     } else {
       console.error("❌ Streaming error:", error);
     }
