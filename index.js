@@ -22,6 +22,7 @@ const { sendDailyCards } = require("./sendDailyCards");
 const {
   SUIT_EMOJI,
 } = require("./utils");
+const { userStreams } = require("./utils/streaming");
 
 // 🧩 3. Команды
 const { startCommand } = require("./commands/start");
@@ -194,5 +195,25 @@ bot.launch().then(() => {
   console.log("✅ Tarot Bot запущен");
 });
 
-process.once("SIGINT", () => bot.stop("SIGINT"));
-process.once("SIGTERM", () => bot.stop("SIGTERM"));
+async function gracefulShutdown(signal) {
+  console.log(`🔄 Получен ${signal}, останавливаю приём новых апдейтов...`);
+  bot.stop(signal);
+
+  const MAX_WAIT = 120_000; // 2 минуты — максимальное время стрима
+  const start = Date.now();
+
+  while (userStreams.size > 0 && Date.now() - start < MAX_WAIT) {
+    console.log(`⏳ Активных стримов: ${userStreams.size}, жду завершения...`);
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+  }
+
+  if (userStreams.size > 0) {
+    console.log(`⚠️ Принудительно завершаю ${userStreams.size} незакрытых стримов`);
+  }
+
+  console.log("✅ Бот завершил работу");
+  process.exit(0);
+}
+
+process.once("SIGINT", () => gracefulShutdown("SIGINT"));
+process.once("SIGTERM", () => gracefulShutdown("SIGTERM"));

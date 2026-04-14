@@ -28,7 +28,7 @@ async function startCommand(ctx) {
         await ctx.telegram.sendMessage(
           referrer.userId,
           "🎉 Новый пользователь зарегистрировался по твоей ссылке! Ты получил +3 вопроса 🔮"
-        );
+        ).catch(() => {});
       } else await db.setInvitedBy(userId, referralCode);
     }
     if (yclid) {
@@ -53,9 +53,10 @@ async function startCommand(ctx) {
 
     db.setUserBlocked(userId, 0);
   } catch (error) {
+    if (error.response?.error_code === 403) return;
     console.error("Ошибка при /start:", error);
     handleBotError(error);
-    await ctx.reply("❌ Произошла ошибка при запуске. Попробуйте позже.");
+    await ctx.reply("❌ Произошла ошибка при запуске. Попробуйте позже.").catch(() => {});
   }
 }
 
