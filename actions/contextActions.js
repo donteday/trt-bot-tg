@@ -15,15 +15,19 @@ async function clearContextAction(ctx) {
     // Редактируем оригинальное сообщение
     await ctx.editMessageText(
       '🧹 *История ваших раскладов очищена.*\n\nТеперь я буду работать только с новыми вопросами.',
-      { 
+      {
         parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: [] } // Убираем кнопки
       }
-    );
-    
+    ).catch(e => {
+      // Игнорируем "message is not modified" (двойное нажатие кнопки)
+      if (e.description?.includes('not modified')) return;
+      throw e;
+    });
+
   } catch (error) {
     console.error('Error clearing context:', error);
-    
+
     // Если не удалось отредактировать (сообщение устарело и т.д.)
     try {
       await ctx.reply('❌ Не удалось очистить историю. Попробуйте позже.');

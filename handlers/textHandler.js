@@ -113,16 +113,25 @@ module.exports = function registerTextHandler(bot) {
       );
       if (collectionResult) await ctx.reply(collectionResult.message);
 
-      const mergedImage = await generateMergedImage(cardsIds, userId);
+      const mergedImage = await Promise.race([
+        generateMergedImage(cardsIds, userId),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("generateMergedImage timeout")), 30000)),
+      ]);
 
       // Отправка фото через поток + удаление после отправки
       try {
         const stream = fs.createReadStream(mergedImage);
-        await ctx.replyWithPhoto({ source: stream });
+        const stats = fs.statSync(mergedImage);
+        console.log(stats.size);
+
+        await Promise.race([
+          ctx.replyWithPhoto({ source: stream }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("replyWithPhoto timeout")), 30000)),
+        ]);
         stream.close();
         fs.unlink(mergedImage, (err) => err && console.error("Ошибка удаления файла:", err));
       } catch (err) {
-        console.error("Ошибка отправки фото расклада:", err);
+        console.error("Ошибка отправки фото расклада:", err.message);
         await ctx.reply("❌ Не удалось отправить изображение расклада.");
       }
 

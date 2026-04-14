@@ -14,6 +14,8 @@ const { sendNoQuestionsMessage, handleBotError } = require("../utils/helpers");
  * Действие "daily_more_X" — показать полную расшифровку карты дня.
  */
 async function dailyMoreAction(ctx) {
+    await ctx.answerCbQuery().catch(() => {});
+
     const userId = ctx.from.id;
     const cardId = ctx.match[1];
     const card = tarotDeck.find((c) => c.id === cardId);
@@ -43,10 +45,15 @@ async function dailyMoreAction(ctx) {
     if (!existing || !existing.interpretation || existing.date !== today) {
         await db.useQuestion(userId);
 
-        await ctx.replyWithPhoto(
-            { source: `./img/${cardId}.jpg` },
-            { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` }
-        );
+        await Promise.race([
+            ctx.replyWithPhoto(
+                { source: `./img/${cardId}.jpg` },
+                { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` }
+            ),
+            new Promise((_, reject) => setTimeout(() => reject(new Error("replyWithPhoto timeout")), 30000)),
+        ]).catch(err => {
+            console.error("Ошибка/таймаут отправки фото карты дня:", err.message);
+        });
 
         const waitingMsg = await ctx.reply("🔮");
 

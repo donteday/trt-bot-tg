@@ -22,6 +22,11 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
   const abortController = new AbortController();
   userStreams.set(userId, { abortController });
 
+  // Таймаут 60 сек на подключение к DeepSeek
+  const fetchTimeoutId = setTimeout(() => {
+    abortController.abort(new Error("DeepSeek fetch timeout after 60s"));
+  }, 60000);
+
   let fullResponse = "";
 
   try {
@@ -47,6 +52,8 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
       }),
       signal: abortController.signal,
     });
+
+    clearTimeout(fetchTimeoutId);
 
     if (!response.ok || response.headers.get("content-type")?.includes("text/html")) {
       const text = await response.text();
@@ -93,8 +100,9 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
 
     await onComplete(fullResponse);
   } catch (error) {
-    if (error.message === "AbortError") {
-      console.log(`🚫 Поток ${userId} остановлен пользователем`);
+    clearTimeout(fetchTimeoutId);
+    if (error.message === "AbortError" || error.message?.includes("timeout")) {
+      console.log(`🚫 Поток ${userId} остановлен или истёк таймаут`);
     } else if (error.code === "ECONNRESET") {
       console.log(`⚠️ Поток ${userId} был сброшен соединением (ECONNRESET)`);
     } else {

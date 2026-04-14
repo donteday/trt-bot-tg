@@ -4,6 +4,8 @@
 
 // 📦 1. Настройки и зависимости
 require("dotenv").config();
+const { HttpsProxyAgent } = require('https-proxy-agent');
+const agent = new HttpsProxyAgent(process.env.PROXY_URL);
 const path = require("path");
 const fs = require("fs");
 const https = require("https");
@@ -48,7 +50,7 @@ const { matrixStart } = require("./actions/matrixStart");
 // ========================================
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
-const bot = new Telegraf(TELEGRAM_TOKEN);
+const bot = new Telegraf(TELEGRAM_TOKEN, { telegram: { agent } });
 const app = express();
 
 app.use(bodyParser.json());
