@@ -64,26 +64,28 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
 
     // Node.js stream
     const stream = response.body;
+    let lineBuffer = ""; // буфер для неполных SSE-строк между чанками
 
     stream.on("error", (err) => {
       console.error(`❌ Поток пользователя ${userId} завершился с ошибкой:`, err);
     });
 
-    stream.on("data", async (chunk) => {
-      const str = decoder.decode(chunk, { stream: true });
-      const lines = str.split("\n");
+    stream.on("data", (chunk) => {
+      lineBuffer += decoder.decode(chunk, { stream: true });
+      const lines = lineBuffer.split("\n");
+      lineBuffer = lines.pop(); // последняя строка может быть неполной — откладываем
 
       for (const line of lines) {
-        if (line.startsWith("data: ") && line !== "data: [DONE]") {
+        if (line.startsWith("data: ") && line.trim() !== "data: [DONE]") {
           try {
             const data = JSON.parse(line.slice(6));
             const content = data.choices?.[0]?.delta?.content;
             if (content) {
               fullResponse += content;
-              await onChunk(content);
+              onChunk(content); // не await — stream не ждёт async, вызываем синхронно
             }
           } catch (e) {
-            // игнорируем JSON ошибки
+            // игнорируем JSON ошибки (неполные строки уже отложены в буфер)
           }
         }
       }
