@@ -160,11 +160,33 @@ async function sendMetrikaHit(userId, eventName = 'bot_start', yclid) {
   }
 }
 
+function isRetryableError(err) {
+  if (err?.response?.error_code === 502) return true;
+  if (err?.code === 'ETIMEDOUT' || err?.message?.includes('ETIMEDOUT')) return true;
+  if (err?.code === 'ECONNRESET') return true;
+  if (err?.type === 'system') return true;
+  return false;
+}
+
+async function withRetry(fn, { maxAttempts = 3, delay = 2000 } = {}) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (!isRetryableError(err) || attempt === maxAttempts) throw err;
+      console.log(`⚠️ Telegram API ошибка (${err.message}), попытка ${attempt}/${maxAttempts}, повтор через ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay * attempt));
+    }
+  }
+}
+
 module.exports = {
   isValidQuestion,
   sendNoQuestionsMessage,
   SUIT_EMOJI,
   splitIntoChunks,
   handleBotError,
-  sendMetrikaHit
+  sendMetrikaHit,
+  isRetryableError,
+  withRetry,
 };

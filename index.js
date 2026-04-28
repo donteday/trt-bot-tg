@@ -5,7 +5,10 @@
 // 📦 1. Настройки и зависимости
 require("dotenv").config();
 const { HttpsProxyAgent } = require('https-proxy-agent');
-const agent = new HttpsProxyAgent(process.env.PROXY_URL);
+const agent = new HttpsProxyAgent(process.env.PROXY_URL, {
+  keepAlive: false,
+  timeout: 30000,
+});
 const path = require("path");
 const fs = require("fs");
 const https = require("https");

@@ -14,6 +14,8 @@ const {
   isValidQuestion,
   sendNoQuestionsMessage,
   SUIT_EMOJI,
+  withRetry,
+  isRetryableError,
 } = require("../utils");
 const { getCardName, buildDailyCardPrompt } = require("../commands/daily");
 const { handleLoveSteps } = require("../commands/love");
@@ -108,10 +110,10 @@ module.exports = function registerTextHandler(bot) {
       const cardsIds = cards.map((c) => c.id);
       const collectionResult = await checkCollections(userId, cards);
 
-      await ctx.reply(
+      await withRetry(() => ctx.reply(
         "🃏 Твои карты:\n" + cards.map((c) => `${c.name} ${SUIT_EMOJI[c.suit]}`).join(", ")
-      );
-      if (collectionResult) await ctx.reply(collectionResult.message);
+      ));
+      if (collectionResult) await withRetry(() => ctx.reply(collectionResult.message));
 
       const mergedImage = await Promise.race([
         generateMergedImage(cardsIds, userId),
@@ -120,19 +122,30 @@ module.exports = function registerTextHandler(bot) {
 
       // Отправка фото через поток + удаление после отправки
       try {
-        const stream = fs.createReadStream(mergedImage);
         const stats = fs.statSync(mergedImage);
         console.log(stats.size);
 
-        await Promise.race([
-          ctx.replyWithPhoto({ source: stream }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error("replyWithPhoto timeout")), 30000)),
-        ]);
-        stream.close();
-        fs.unlink(mergedImage, (err) => err && console.error("Ошибка удаления файла:", err));
+        let sent = false;
+        for (let attempt = 1; attempt <= 3 && !sent; attempt++) {
+          try {
+            const stream = fs.createReadStream(mergedImage);
+            await Promise.race([
+              ctx.replyWithPhoto({ source: stream }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error("replyWithPhoto timeout")), 30000)),
+            ]);
+            stream.destroy();
+            sent = true;
+          } catch (err) {
+            if (!isRetryableError(err) || attempt === 3) throw err;
+            console.log(`⚠️ Попытка ${attempt}/3 отправки фото не удалась (${err.message}), повтор...`);
+            await new Promise(r => setTimeout(r, 2000 * attempt));
+          }
+        }
       } catch (err) {
         console.error("Ошибка отправки фото расклада:", err.message);
         await ctx.reply("❌ Не удалось отправить изображение расклада.");
+      } finally {
+        fs.unlink(mergedImage, (err) => err && console.error("Ошибка удаления файла:", err));
       }
 
       const waitingMsg = await ctx.reply("🔮");
