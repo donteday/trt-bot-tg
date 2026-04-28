@@ -6,7 +6,7 @@
 require("dotenv").config();
 const { HttpsProxyAgent } = require('https-proxy-agent');
 const agent = new HttpsProxyAgent(process.env.PROXY_URL, {
-  keepAlive: false,
+  keepAlive: true,
   timeout: 30000,
 });
 const path = require("path");
