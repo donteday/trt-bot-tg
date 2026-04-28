@@ -1,11 +1,5 @@
 const { Markup } = require("telegraf");
 const fetch = require("node-fetch");
-process.on("unhandledRejection", (reason) => {
-  console.error("⚠️ Неотловленный Promise:", reason);
-});
-process.on("uncaughtException", (err) => {
-  console.error("💥 Непойманная ошибка:", err);
-});
 
 // ✅ Проверка корректности вопроса
 function isValidQuestion(text) {
@@ -165,17 +159,25 @@ function isRetryableError(err) {
   if (err?.code === 'ETIMEDOUT' || err?.message?.includes('ETIMEDOUT')) return true;
   if (err?.code === 'ECONNRESET') return true;
   if (err?.type === 'system') return true;
+  if (err?.message?.includes('timed out')) return true;
   return false;
 }
 
-async function withRetry(fn, { maxAttempts = 3, delay = 2000 } = {}) {
+// Оборачивает вызов Telegram API с таймаутом и retry.
+// timeout — максимум на одну попытку (не зависит от OS).
+async function withRetry(fn, { maxAttempts = 2, delay = 1000, timeout = 8000 } = {}) {
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      return await fn();
+      return await Promise.race([
+        fn(),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`Telegram request timed out after ${timeout}ms`)), timeout)
+        ),
+      ]);
     } catch (err) {
       if (!isRetryableError(err) || attempt === maxAttempts) throw err;
-      console.log(`⚠️ Telegram API ошибка (${err.message}), попытка ${attempt}/${maxAttempts}, повтор через ${delay}ms...`);
-      await new Promise(r => setTimeout(r, delay * attempt));
+      console.log(`⚠️ Telegram API ошибка (${err.message}), попытка ${attempt}/${maxAttempts}...`);
+      await new Promise(r => setTimeout(r, delay));
     }
   }
 }

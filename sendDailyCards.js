@@ -2,10 +2,11 @@
 const dayjs = require('dayjs');
 const { Markup } = require('telegraf');
 const db = require('./db.js');
+const { isRetryableError } = require('./utils');
 
 // Основная функция рассылки
 async function sendDailyCards(bot, tarotDeck, options = {}) {
-    const BATCH_SIZE = options.batchSize ?? 25;     // сколько отправляем параллельно
+    const BATCH_SIZE = options.batchSize ?? 10;     // сколько отправляем параллельно
     const BATCH_DELAY = options.batchDelay ?? 2000; // пауза между батчами (мс)
     const today = dayjs().format('YYYY-MM-DD');
 
@@ -23,23 +24,31 @@ async function sendDailyCards(bot, tarotDeck, options = {}) {
                     const card = tarotDeck[Math.floor(Math.random() * tarotDeck.length)];
                     db.saveDailyCard(userId, today, card.id);
 
-                    await bot.telegram.sendPhoto(
-                        userId,
-                        { source: `./img/dailycard.png` },
-                        {
-                            caption: `🃏 Ваша карта дня — готова!\n\nХотите получить персональную интерпретацию по вашей дате рождения и узнать влияние на ваш знак зодиака ❓\n🎯 Расшифровать карту: -1 запрос \n\n❤️ Скоро телеграмм заблокируют, переходите к нам на сайт https://taroyal.ru/ \nБольше раскладов, можно обсудить вопрос, по промокоду TAROSHKA - 10 раскладов бесплатно`,
-                            ...Markup.inlineKeyboard([
-                                [Markup.button.callback('🔮 Открыть', `daily_more_${card.id}`)],
-                                [Markup.button.callback('🔕 Отключить карту дня', 'daily_disable')]
-                            ])
+                    const payload = {
+                        caption: `🃏 Ваша карта дня — готова!\n\nХотите получить персональную интерпретацию по вашей дате рождения и узнать влияние на ваш знак зодиака ❓\n🎯 Расшифровать карту: -1 запрос \n\n❤️ Скоро телеграмм заблокируют, переходите к нам на сайт https://taroyal.ru/ \nБольше раскладов, можно обсудить вопрос, по промокоду TAROSHKA - 10 раскладов бесплатно`,
+                        ...Markup.inlineKeyboard([
+                            [Markup.button.callback('🔮 Открыть', `daily_more_${card.id}`)],
+                            [Markup.button.callback('🔕 Отключить карту дня', 'daily_disable')]
+                        ])
+                    };
+
+                    let sent = false;
+                    for (let attempt = 1; attempt <= 2 && !sent; attempt++) {
+                        try {
+                            await bot.telegram.sendPhoto(userId, { source: `./img/dailycard.png` }, payload);
+                            sent = true;
+                        } catch (err) {
+                            if (err.response?.error_code === 403) { db.setUserBlocked(userId, 1); return; }
+                            if (!isRetryableError(err) || attempt === 2) throw err;
+                            await new Promise(r => setTimeout(r, 3000));
                         }
-                    );
+                    }
                 }
             } catch (error) {
                 if (error.response?.error_code === 403) {
                     db.setUserBlocked(userId, 1);
                     return;
-                  }
+                }
                 console.log(`❌ Ошибка при отправке пользователю ${userId}: ${error.message}`);
             }
         }));

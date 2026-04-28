@@ -51,7 +51,10 @@ const { matrixStart } = require("./actions/matrixStart");
 // ========================================
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
-const bot = new Telegraf(TELEGRAM_TOKEN, { telegram: { agent }, handlerTimeout: 150000 });
+const bot = new Telegraf(TELEGRAM_TOKEN, {
+  telegram: { agent, timeout: 40000 },
+  handlerTimeout: 150000,
+});
 const app = express();
 
 app.use(bodyParser.json());
@@ -191,7 +194,7 @@ bot.command("matrix", matrixCommand);
 
 require("./handlers/textHandler")(bot);
 
-bot.launch().then(() => {
+bot.launch({ allowedUpdates: ['message', 'callback_query'] }).then(() => {
   console.log("✅ Tarot Bot запущен");
 });
 

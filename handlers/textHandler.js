@@ -61,15 +61,27 @@ module.exports = function registerTextHandler(bot) {
 
       // Отправка фото через поток и удаление после отправки
       try {
-        const stream = fs.createReadStream(`./img/${cardId}.jpg`);
-        await ctx.replyWithPhoto({ source: stream }, { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` });
-        stream.close();
+        let sent = false;
+        for (let attempt = 1; attempt <= 2 && !sent; attempt++) {
+          try {
+            const stream = fs.createReadStream(`./img/${cardId}.jpg`);
+            await Promise.race([
+              ctx.replyWithPhoto({ source: stream }, { caption: `🃏 Ваша карта дня: ${getCardName(cardId)}` }),
+              new Promise((_, reject) => setTimeout(() => reject(new Error("replyWithPhoto timeout")), 15000)),
+            ]);
+            stream.destroy();
+            sent = true;
+          } catch (err) {
+            if (!isRetryableError(err) || attempt === 2) throw err;
+            await new Promise(r => setTimeout(r, 1000));
+          }
+        }
       } catch (err) {
-        console.error("Ошибка отправки карты дня:", err);
-        await ctx.reply("❌ Не удалось отправить изображение карты дня.");
+        console.error("Ошибка отправки карты дня:", err.message);
+        await ctx.reply("❌ Не удалось отправить изображение карты дня.").catch(() => {});
       }
 
-      const waitingMsg = await ctx.reply("🔮");
+      const waitingMsg = await withRetry(() => ctx.reply("🔮"));
       return askDailyInterpretation(ctx, card.name, question, today, waitingMsg);
     }
 
