@@ -54,7 +54,7 @@ const { matrixStart } = require("./actions/matrixStart");
 // ========================================
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
-const bot = new Telegraf(TELEGRAM_TOKEN, { telegram: { agent } });
+const bot = new Telegraf(TELEGRAM_TOKEN, { telegram: { agent }, handlerTimeout: 150000 });
 const app = express();
 
 app.use(bodyParser.json());

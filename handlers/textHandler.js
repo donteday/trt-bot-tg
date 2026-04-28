@@ -126,19 +126,19 @@ module.exports = function registerTextHandler(bot) {
         console.log(stats.size);
 
         let sent = false;
-        for (let attempt = 1; attempt <= 3 && !sent; attempt++) {
+        for (let attempt = 1; attempt <= 2 && !sent; attempt++) {
           try {
             const stream = fs.createReadStream(mergedImage);
             await Promise.race([
               ctx.replyWithPhoto({ source: stream }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error("replyWithPhoto timeout")), 30000)),
+              new Promise((_, reject) => setTimeout(() => reject(new Error("replyWithPhoto timeout")), 15000)),
             ]);
             stream.destroy();
             sent = true;
           } catch (err) {
-            if (!isRetryableError(err) || attempt === 3) throw err;
-            console.log(`⚠️ Попытка ${attempt}/3 отправки фото не удалась (${err.message}), повтор...`);
-            await new Promise(r => setTimeout(r, 2000 * attempt));
+            if (!isRetryableError(err) || attempt === 2) throw err;
+            console.log(`⚠️ Попытка ${attempt}/2 отправки фото не удалась (${err.message}), повтор...`);
+            await new Promise(r => setTimeout(r, 2000));
           }
         }
       } catch (err) {
@@ -148,7 +148,7 @@ module.exports = function registerTextHandler(bot) {
         fs.unlink(mergedImage, (err) => err && console.error("Ошибка удаления файла:", err));
       }
 
-      const waitingMsg = await ctx.reply("🔮");
+      const waitingMsg = await withRetry(() => ctx.reply("🔮"));
       userStreams.set(userId, true);
 
       const userStyle = await db.getUserResponseStyle(userId);
