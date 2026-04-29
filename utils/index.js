@@ -4,4 +4,5 @@ module.exports = {
   ...require("./helpers"),
   ...require("./streaming"),
   ...require("./collections"),
+  ...require("./proxyAgent"),
 };

@@ -4,8 +4,8 @@
 
 // 📦 1. Настройки и зависимости
 require("dotenv").config();
-const { HttpsProxyAgent } = require('https-proxy-agent');
-const agent = new HttpsProxyAgent(process.env.PROXY_URL, { keepAlive: true });
+const { getAgent, switchAgent } = require('./utils/proxyAgent');
+const { setRetryHook, isRetryableError } = require('./utils/helpers');
 const path = require("path");
 const fs = require("fs");
 const https = require("https");
@@ -52,8 +52,15 @@ const { matrixStart } = require("./actions/matrixStart");
 
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
 const bot = new Telegraf(TELEGRAM_TOKEN, {
-  telegram: { agent, timeout: 40000 },
+  telegram: { agent: getAgent(), timeout: 40000 },
   handlerTimeout: 150000,
+});
+
+setRetryHook((err) => {
+  if (isRetryableError(err)) {
+    const switched = switchAgent();
+    if (switched) bot.telegram.options.agent = getAgent();
+  }
 });
 const app = express();
 

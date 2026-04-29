@@ -163,6 +163,9 @@ function isRetryableError(err) {
   return false;
 }
 
+let _retryHook = null;
+function setRetryHook(fn) { _retryHook = fn; }
+
 // Оборачивает вызов Telegram API с таймаутом и retry.
 // timeout — максимум на одну попытку (не зависит от OS).
 async function withRetry(fn, { maxAttempts = 2, delay = 1000, timeout = 8000 } = {}) {
@@ -176,6 +179,7 @@ async function withRetry(fn, { maxAttempts = 2, delay = 1000, timeout = 8000 } =
       ]);
     } catch (err) {
       if (!isRetryableError(err) || attempt === maxAttempts) throw err;
+      if (_retryHook) _retryHook(err);
       console.log(`⚠️ Telegram API ошибка (${err.message}), попытка ${attempt}/${maxAttempts}...`);
       await new Promise(r => setTimeout(r, delay));
     }
