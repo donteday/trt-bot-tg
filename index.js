@@ -170,7 +170,7 @@ bot.telegram.setMyCommands([
   { command: 'context', description: '📖 История' },
   { command: 'balance', description: '💰 Мой баланс' },
   { command: 'price', description: '💎 Узнать цены' }
-]);
+]).catch(err => console.error('⚠️ setMyCommands failed:', err.message));
 
 bot.start(startCommand);
 
@@ -201,9 +201,21 @@ bot.command("matrix", matrixCommand);
 
 require("./handlers/textHandler")(bot);
 
-bot.launch({ allowedUpdates: ['message', 'callback_query'] }).then(() => {
-  console.log("✅ Tarot Bot запущен");
-});
+async function launchWithRetry(maxAttempts = 10, delay = 5000) {
+  for (let i = 1; i <= maxAttempts; i++) {
+    try {
+      await bot.launch({ allowedUpdates: ['message', 'callback_query'] });
+      console.log("✅ Tarot Bot запущен");
+      return;
+    } catch (err) {
+      console.error(`❌ Запуск не удался (попытка ${i}/${maxAttempts}): ${err.message}`);
+      if (i === maxAttempts) throw err;
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+}
+
+launchWithRetry();
 
 async function gracefulShutdown(signal) {
   console.log(`🔄 Получен ${signal}, останавливаю приём новых апдейтов...`);

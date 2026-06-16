@@ -48,7 +48,7 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
         ],
         stream: true,
         temperature: 1,
-        max_tokens: 3500,
+        max_tokens: 8000,
       }),
       signal: abortController.signal,
     });
@@ -83,6 +83,12 @@ async function askOpenAIStreaming(userId, prompt, onChunk, onComplete) {
             if (content) {
               fullResponse += content;
               onChunk(content); // не await — stream не ждёт async, вызываем синхронно
+            }
+            const finishReason = data.choices?.[0]?.finish_reason;
+            if (finishReason === "length") {
+              const notice = "\n\n⚠️ _Ответ был обрезан из-за ограничения длины. Попробуйте задать более конкретный вопрос._";
+              fullResponse += notice;
+              onChunk(notice);
             }
           } catch (e) {
             // игнорируем JSON ошибки (неполные строки уже отложены в буфер)
