@@ -195,4 +195,5 @@ module.exports = {
   sendMetrikaHit,
   isRetryableError,
   withRetry,
+  setRetryHook,
 };
