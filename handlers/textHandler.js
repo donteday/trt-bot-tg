@@ -16,6 +16,8 @@ const {
   SUIT_EMOJI,
   withRetry,
   isRetryableError,
+  sendLongMessage,
+  buildStreamPreview,
 } = require("../utils");
 const { getCardName, buildDailyCardPrompt } = require("../commands/daily");
 const { handleLoveSteps } = require("../commands/love");
@@ -190,15 +192,13 @@ module.exports = function registerTextHandler(bot) {
               if (Date.now() - lastUpdate > 2000) {
                 lastUpdate = Date.now();
                 await ctx.telegram
-                  .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, currentText + " 🔮")
+                  .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, buildStreamPreview(currentText))
                   .catch(() => { });
               }
             },
             async (finalText) => {
               db.saveToContext(userId, question, finalText, cards);
-              await ctx.telegram
-                .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, finalText)
-                .catch(() => { });
+              await sendLongMessage(ctx, waitingMsg, finalText);
               userStreams.delete(userId);
             }
           );
@@ -241,14 +241,12 @@ async function askDailyInterpretation(ctx, card, birthday, today, waitingMsg) {
         if (Date.now() - lastUpdate > 2000) {
           lastUpdate = Date.now();
           await ctx.telegram
-            .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, currentText + " 🔮")
+            .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, buildStreamPreview(currentText))
             .catch(() => { });
         }
       },
       async (finalText) => {
-        await ctx.telegram
-          .editMessageText(waitingMsg.chat.id, waitingMsg.message_id, undefined, finalText)
-          .catch(() => { });
+        await sendLongMessage(ctx, waitingMsg, finalText);
         await db.saveDailyInterpretation(userId, today, finalText);
         userStreams.delete(userId);
       }

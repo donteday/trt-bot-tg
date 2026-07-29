@@ -2,7 +2,7 @@
 const { Markup } = require("telegraf");
 const { askOpenAIStreaming, userStreams } = require("../utils/streaming");
 const { buildLovePromptShort } = require("../utils/lovePrompts");
-const { isValidQuestion } = require("../utils/helpers");
+const { isValidQuestion, sendLongMessage, buildStreamPreview } = require("../utils/helpers");
 const { userStates } = require("../state/userStates");
 const { setLovePair } = require("../state/loveCache");
 
@@ -68,22 +68,15 @@ async function handleLoveSteps(ctx) {
                   waitingMsg.chat.id,
                   waitingMsg.message_id,
                   undefined,
-                  currentText + " 🔮"
+                  buildStreamPreview(currentText)
                 )
                 .catch(() => { });
             }
           },
           async (finalText) => {
             try {
-              // Финально редактируем текущее сообщение — только текст
-              await ctx.telegram
-                .editMessageText(
-                  waitingMsg.chat.id,
-                  waitingMsg.message_id,
-                  undefined,
-                  finalText
-                )
-                .catch(() => { });
+              // Финально отправляем текст (с разбивкой на части при необходимости)
+              await sendLongMessage(ctx, waitingMsg, finalText);
 
               // 🆕 Отправляем отдельное сообщение с кнопкой
               // userStates.set(userId, {

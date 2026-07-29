@@ -7,7 +7,7 @@ const { getCardName } = require("../commands/daily");
 const { buildDailyCardPrompt } = require("../commands/daily");
 const { askOpenAIStreaming, userStreams } = require("../utils/streaming");
 const { userStates } = require("../state/userStates");
-const { sendNoQuestionsMessage, handleBotError } = require("../utils/helpers");
+const { sendNoQuestionsMessage, handleBotError, sendLongMessage, buildStreamPreview } = require("../utils/helpers");
 
 
 /**
@@ -76,17 +76,12 @@ async function dailyMoreAction(ctx) {
                                 waitingMsg.chat.id,
                                 waitingMsg.message_id,
                                 undefined,
-                                currentText + " 🔮"
+                                buildStreamPreview(currentText)
                             ).catch(() => { });
                         }
                     },
                     async (finalText) => {
-                        await ctx.telegram.editMessageText(
-                            waitingMsg.chat.id,
-                            waitingMsg.message_id,
-                            undefined,
-                            finalText
-                        ).catch(() => { });
+                        await sendLongMessage(ctx, waitingMsg, finalText);
                         await db.saveDailyInterpretation(userId, today, finalText);
                         userStreams.delete(userId);
                     }

@@ -68,13 +68,64 @@ function splitIntoChunks(text, maxLen = 3500) {
   while (remaining.length > maxLen) {
     // стараемся порезать по границе абзаца или строки
     let cutAt = remaining.lastIndexOf("\n", maxLen);
-    if (cutAt === -1) cutAt = maxLen;
+    // cutAt === 0 — кусок начинается с перевода строки, резать там нельзя:
+    // получится пустая часть и бесконечный цикл. Отступаем к границе слова.
+    if (cutAt <= 0) cutAt = remaining.lastIndexOf(" ", maxLen);
+    if (cutAt <= 0) cutAt = maxLen;
     chunks.push(remaining.slice(0, cutAt));
     remaining = remaining.slice(cutAt);
   }
 
   if (remaining.trim()) chunks.push(remaining);
   return chunks;
+}
+
+/**
+ * Отправляет длинный текст, не упираясь в лимит Telegram (4096 символов).
+ * Первая часть заменяет сообщение-заглушку ("🔮"), остальные уходят
+ * новыми сообщениями. Без этого Telegram отвечает 400 "message is too long"
+ * и пользователь видит обрезанный текст.
+ *
+ * @param {import("telegraf").Context} ctx
+ * @param {{chat: {id: number}, message_id: number}} waitingMsg - сообщение-заглушка
+ * @param {string} text - полный текст ответа
+ */
+async function sendLongMessage(ctx, waitingMsg, text) {
+  const chunks = splitIntoChunks(text, 3500);
+  if (!chunks.length) return;
+
+  // Первая часть — в старое сообщение, если не вышло, то новым
+  try {
+    await withRetry(() =>
+      ctx.telegram.editMessageText(
+        waitingMsg.chat.id,
+        waitingMsg.message_id,
+        undefined,
+        chunks[0]
+      )
+    );
+  } catch (err) {
+    console.error("⚠️ Не удалось отредактировать сообщение:", err.message);
+    await withRetry(() => ctx.reply(chunks[0])).catch((e) =>
+      console.error("❌ Первая часть ответа не доставлена:", e.message)
+    );
+  }
+
+  // Остальное — новыми сообщениями
+  for (let i = 1; i < chunks.length; i++) {
+    await withRetry(() => ctx.reply(chunks[i])).catch((e) =>
+      console.error(`❌ Часть ${i + 1}/${chunks.length} не доставлена:`, e.message)
+    );
+  }
+}
+
+/**
+ * Готовит превью для промежуточных правок во время стриминга.
+ * Обрезает до 3500 символов — иначе editMessageText начнёт падать
+ * с "message is too long" и текст в чате замрёт.
+ */
+function buildStreamPreview(text) {
+  return text.length > 3500 ? text.slice(0, 3500) + " …" : text + " 🔮";
 }
 
 async function handleBotError(ctx, error, source = "") {
@@ -191,6 +242,8 @@ module.exports = {
   sendNoQuestionsMessage,
   SUIT_EMOJI,
   splitIntoChunks,
+  sendLongMessage,
+  buildStreamPreview,
   handleBotError,
   sendMetrikaHit,
   isRetryableError,
