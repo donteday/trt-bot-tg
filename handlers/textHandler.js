@@ -127,10 +127,20 @@ module.exports = function registerTextHandler(bot) {
       ));
       if (collectionResult) await withRetry(() => ctx.reply(collectionResult.message));
 
-      const mergedImage = await Promise.race([
-        generateMergedImage(cardsIds, userId),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("generateMergedImage timeout")), 30000)),
-      ]);
+      const mergedImagePromise = generateMergedImage(cardsIds, userId);
+      let mergedImage;
+      try {
+        mergedImage = await Promise.race([
+          mergedImagePromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error("generateMergedImage timeout")), 30000)),
+        ]);
+      } catch (err) {
+        // generateMergedImage продолжает работать в фоне даже после таймаута
+        // и всё равно запишет файл на диск — удаляем его, когда он появится,
+        // иначе он останется на диске навсегда.
+        mergedImagePromise.then((filePath) => fs.unlink(filePath, () => {})).catch(() => {});
+        throw err;
+      }
 
       // Отправка фото через поток + удаление после отправки
       try {

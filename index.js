@@ -22,6 +22,7 @@ const { sendDailyCards } = require("./sendDailyCards");
 const {
   SUIT_EMOJI,
 } = require("./utils");
+const { cleanupOrphanedImages } = require("./utils/images");
 const { userStreams } = require("./utils/streaming");
 
 // 🧩 3. Команды
@@ -74,6 +75,10 @@ cron.schedule('0 9 * * *', async () => {
   // 09:00 каждый день
   await sendDailyCards(bot, tarotDeck, { batchSize: 25, batchDelay: 2000 });
 });
+
+// 🧹 Очистка осиротевших временных изображений (merged-/bonus-) каждые 10 минут
+cleanupOrphanedImages();
+cron.schedule('*/10 * * * *', () => cleanupOrphanedImages());
 // (async () => {
 //   console.log('📢 Тест рассылки карт дня начат');
 //   await sendDailyCards(bot, tarotDeck, { batchSize: 5, batchDelay: 1000 });

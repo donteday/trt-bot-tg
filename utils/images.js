@@ -91,4 +91,33 @@ async function generateBonusImage(cardIds, userId) {
 }
 
 
-module.exports = { drawCards, generateMergedImage, generateBonusImage };
+// 🧹 Удаляет "осиротевшие" merged-/bonus- файлы (например, после таймаутов
+// или падения процесса), которые не были удалены обработчиками.
+function cleanupOrphanedImages(maxAgeMs = 10 * 60 * 1000) {
+  const dir = path.join(__dirname, "..");
+  let files;
+  try {
+    files = fs.readdirSync(dir);
+  } catch (err) {
+    console.error("❌ Ошибка чтения директории для очистки временных изображений:", err);
+    return;
+  }
+
+  const now = Date.now();
+  for (const file of files) {
+    if (!/^(merged|bonus)-.+\.jpg$/.test(file)) continue;
+
+    const filePath = path.join(dir, file);
+    try {
+      const stats = fs.statSync(filePath);
+      if (now - stats.mtimeMs > maxAgeMs) {
+        fs.unlinkSync(filePath);
+        console.log("🧹 Удалён осиротевший файл изображения:", file);
+      }
+    } catch (err) {
+      // Файл мог быть удалён параллельно — игнорируем
+    }
+  }
+}
+
+module.exports = { drawCards, generateMergedImage, generateBonusImage, cleanupOrphanedImages };
